@@ -10,7 +10,10 @@ from datetime import datetime, timedelta
 from market_digest.models import NewsEvent, NewsItem
 
 _WORD = re.compile(r"[a-z0-9ąćęłńóśźż]+", re.I)
-_STOP = frozenset("the a an of and or to in on for with by at from is are as its new".split())
+_STOP = frozenset({
+    "the", "a", "an", "of", "and", "or", "to", "in", "on", "for",
+    "with", "by", "at", "from", "is", "are", "as", "its", "new",
+})
 TIER_WEIGHT = {"official": 3.0, "specialist": 2.0, "media": 1.5}
 SIMILARITY_THRESHOLD = 0.6
 

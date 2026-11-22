@@ -80,7 +80,7 @@ def test_missing_ticker_does_not_break_report(cfg: Config) -> None:
 
 
 def test_rerun_with_same_data_is_idempotent(cfg: Config) -> None:
-    first, st = _run(cfg)
+    _, st = _run(cfg)
     again = pipeline.generate(cfg, st, FakeCalendar(), NOW,
                               failed_sources={"rss:boj": "ConnectError"})
     assert again.skipped_unchanged

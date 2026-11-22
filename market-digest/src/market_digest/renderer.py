@@ -68,7 +68,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
       f"{sess('other_developed')}  ")
     w(f"> **Rodzaj dnia dla regionów (wg daty raportu):** {statuses}  ")
     w(f"> **Status raportu:** {status} (treść: {ev.content_status}, tryb: {content.generation_mode})  ")
-    latest = max((e.published_at_utc for e in ev.events if e.published_at_utc), default=None)
+    latest = max((p for e in ev.events if (p := e.published_at_utc) is not None), default=None)
     w(f"> **Źródła aktualizowane do:** {latest.isoformat() if latest else NA} (UTC)  ")
     w(f"> **Wersja danych / run:** {ev.fingerprint()} / {ev.run_id}")
     w("")

@@ -41,7 +41,8 @@ class ExchangeCalendars:
         sessions = cal.sessions_in_range(max(start, cal.first_session), min(end, cal.last_session))
         for session in reversed(list(sessions)):
             if cal.session_close(session) <= ts:
-                return session.date()  # type: ignore[no-any-return]
+                found: date = session.date()
+                return found
         return None
 
     def day_status(self, exchange: str, local_day: date) -> DayStatus:
