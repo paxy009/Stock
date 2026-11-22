@@ -1,0 +1,194 @@
+# PRZYKŁADOWY KONTRAKT, nieimplementowany jeszcze w Pythonie.
+# Wszystkie symbole i klasyfikacje dostawców należy sprawdzić przed uruchomieniem.
+# Nie przechowuj tutaj tokenów ani haseł.
+
+app:
+  name: market_digest
+  language: pl
+  timezone: Europe/Warsaw
+  db_path: data/market.db
+  reports_dir: reports
+  cache_dir: data/cache
+
+coverage:
+  classification_provider: MSCI
+  classification_name: Developed Markets
+  classification_as_of: null  # data weryfikacji przy starcie, przechowywana w snapshotach
+  include_only_developed_markets: true
+  explicitly_excluded_countries: [PL]
+  exclude_emerging_and_frontier: true
+  uncertain_instrument_policy: requires_review
+  allow_emerging_market_context_news: true  # tylko wpływ na rynki rozwinięte
+  include_poland_only_for_fx_conversion: true
+  regions:
+    us:
+      enabled: true
+      priority: high
+      example_markets: [US]
+    developed_europe:
+      enabled: true
+      priority: high
+      example_markets: [DE, FR, GB, NL, CH, SE, DK, 'NO', FI]
+    developed_asia:
+      enabled: true
+      priority: medium
+      example_markets: [JP, SG, HK]
+      mandatory_examples: [JP]
+      verify_issuer_country_for_hk: true
+    other_developed:
+      enabled: true
+      priority: medium
+      example_markets: [CA, AU, NZ]
+
+schedule:
+  enabled: true
+  run_every_day: true
+  local_time: '23:30'
+  timezone: Europe/Warsaw
+  weekend_mode: news_and_weekly_on_sunday
+  non_trading_day_mode: per_market_last_completed_session
+
+report:
+  format: markdown
+  report_file_pattern: 'reports/{report_date}.md'
+  min_key_takeaways: 3
+  max_key_takeaways: 5
+  max_featured_events: 5
+  target_word_count_min: 900
+  target_word_count_max: 1500
+  compare_previous: true
+  include_source_links: true
+  include_data_quality_section: true
+  include_weekly_review_on_sunday: true
+  include_regional_market_snapshot: true
+  show_regional_last_session_dates: true
+  report_native_currency: true
+  optional_fx_reporting_currency: PLN
+  exclude_personalized_buy_sell_advice: true
+
+providers:
+  prices:
+    kind: yfinance
+    cache: true
+  fundamentals:
+    kind: sec_edgar
+    enabled: false  # rozszerzyć o providerów regionalnych w kolejnych etapach
+    user_agent_env: SEC_USER_AGENT
+  macro:
+    kind: fred
+    enabled: false  # dodatkowe banki centralne później
+    api_key_env: FRED_API_KEY
+  news:
+    kind: rss
+    feeds: []
+    limit_new_articles_per_run: 60
+    max_chars_per_article_for_llm: 700
+
+instruments:
+  equities:
+    - {symbol: NVDA, issuer_country: US, region: us, benchmark: QQQ, currency: USD}
+    - {symbol: MSFT, issuer_country: US, region: us, benchmark: QQQ, currency: USD}
+    - {symbol: GOOGL, issuer_country: US, region: us, benchmark: QQQ, currency: USD}
+    - {symbol: AMZN, issuer_country: US, region: us, benchmark: QQQ, currency: USD}
+    - {symbol: META, issuer_country: US, region: us, benchmark: QQQ, currency: USD}
+    - {symbol: AMD, issuer_country: US, region: us, benchmark: SMH, currency: USD}
+    - {symbol: AVGO, issuer_country: US, region: us, benchmark: SMH, currency: USD}
+    - {symbol: JPM, issuer_country: US, region: us, benchmark: XLF, currency: USD}
+    - {symbol: UUUU, issuer_country: US, region: us, benchmark: null, currency: USD}
+    - {symbol: ASML, issuer_country: NL, region: developed_europe, benchmark: VGK, currency: USD, listing: US_ADR}
+    - {symbol: SAP, issuer_country: DE, region: developed_europe, benchmark: VGK, currency: USD, listing: US_ADR}
+    - {symbol: TM, issuer_country: JP, region: developed_asia, benchmark: EWJ, currency: USD, listing: US_ADR}
+    - {symbol: RY, issuer_country: CA, region: other_developed, benchmark: EWC, currency: USD, listing: US}
+    - {symbol: CCJ, issuer_country: CA, region: other_developed, benchmark: EWC, currency: USD, listing: US}
+    - {symbol: BHP, issuer_country: AU, region: other_developed, benchmark: EWA, currency: USD, listing: US_ADR}
+  etfs:
+    - {symbol: SPY, target_region: us, currency: USD, listing_market: US}
+    - {symbol: QQQ, target_region: us, currency: USD, listing_market: US}
+    - {symbol: RSP, target_region: us, currency: USD, listing_market: US}
+    - {symbol: SMH, target_region: us, currency: USD, listing_market: US, eligibility: requires_review}
+    - {symbol: XLF, target_region: us, currency: USD, listing_market: US}
+    - {symbol: SGOV, target_region: us, currency: USD, listing_market: US}
+    - {symbol: VGK, target_region: developed_europe, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: FEZ, target_region: developed_europe, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: EWJ, target_region: developed_asia, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: EWC, target_region: other_developed, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: EWA, target_region: other_developed, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: EFA, target_region: developed_ex_us, currency: USD, listing_market: US, is_regional_proxy: true}
+    - {symbol: GLD, category: precious_metals, currency: USD, listing_market: US}
+    # Tematyczne ETF-y, które mogą zawierać EM (np. URA/URNM), wymagają sprawdzenia składu.
+  futures:
+    - {symbol: 'GC=F', commodity: gold, currency: USD}
+    - {symbol: 'SI=F', commodity: silver, currency: USD}
+    - {symbol: 'CL=F', commodity: crude_oil, currency: USD}
+    - {symbol: 'HG=F', commodity: copper, currency: USD}
+  forex:
+    - {symbol: 'USDPLN=X', quote_currency: PLN}
+    - {symbol: 'EURPLN=X', quote_currency: PLN}
+    - {symbol: 'JPYPLN=X', quote_currency: PLN}
+    - {symbol: 'GBPPLN=X', quote_currency: PLN}
+    - {symbol: 'CADPLN=X', quote_currency: PLN}
+    - {symbol: 'AUDPLN=X', quote_currency: PLN}
+
+# Symbole lokalnych indeksów NIE są tu zgadywane; zweryfikować u dostawcy danych.
+regional_benchmarks:
+  - {name: 'S&P 500', region: us, provider_symbol: null, currency: USD}
+  - {name: 'STOXX Europe 600', region: developed_europe, provider_symbol: null, currency: EUR}
+  - {name: 'Nikkei 225', region: developed_asia, provider_symbol: null, currency: JPY}
+  - {name: 'S&P/TSX Composite', region: other_developed, provider_symbol: null, currency: CAD}
+  - {name: 'S&P/ASX 200', region: other_developed, provider_symbol: null, currency: AUD}
+
+historical_lookback:
+  equities_years: 5
+  etfs_years: 10
+  futures_years: 5
+  macro_years: 10
+
+metrics:
+  returns_sessions: [1, 5, 21, 63, 126, 252]
+  drawdown_52w: true
+  sma_sessions: [50, 200]
+  realized_vol_sessions: [20, 60]
+  benchmark_relative_returns: true
+  regional_currency_normalization: true
+
+macro_series:  # przykładowe FRED USA; inne banki centralne wymagają oddzielnych adapterów
+  - DGS2
+  - DGS10
+  - FEDFUNDS
+  - CPIAUCSL
+  - PCEPI
+  - UNRATE
+
+llm:
+  provider: template
+  model: auto
+  max_articles_in_context: 25
+  allow_external_browsing: false
+  fallback_to_template: true
+  daily_budget_usd: 1.00
+  validate_structured_output: true
+
+delivery:
+  enabled: false
+  provider: smtp
+  recipient_env: DIGEST_RECIPIENT_EMAIL
+  smtp_host_env: SMTP_HOST
+  smtp_port_env: SMTP_PORT
+  smtp_username_env: SMTP_USERNAME
+  smtp_password_env: SMTP_PASSWORD
+  attach_markdown_file: true
+  prevent_duplicate_sends: true
+  retries: 3
+
+quality:
+  minimum_watchlist_coverage: 0.8
+  calculate_coverage_per_region: true
+  required_reporting_regions: [us, developed_europe, developed_asia]
+  require_source_for_featured_events: true
+  fail_closed_on_unverified_numbers: true
+  label_partial_reports: true
+  utc_timestamps_in_storage: true
+
+logging:
+  level: INFO
+  log_secrets: false

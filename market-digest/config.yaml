@@ -1,0 +1,94 @@
+# Market Digest — konfiguracja Etapu 1.
+# Sekrety NIE trafiają do tego pliku (Etap 2: GitHub Secrets / zmienne środowiskowe).
+
+app:
+  timezone: Europe/Warsaw
+  db_path: data/market.db
+  reports_dir: reports
+
+coverage:
+  classification_provider: MSCI
+  classification_name: Developed Markets
+  # Lista krajów DM do potwierdzenia na stronie MSCI (Market Classification) przed produkcją.
+  classification_as_of: null
+  developed_countries: [US, CA, AT, BE, DK, FI, FR, DE, IE, IL, IT, NL, 'NO', PT, ES, SE, CH, GB,
+                        AU, HK, JP, NZ, SG]
+  explicitly_excluded_countries: [PL]
+  required_regions: [us, developed_europe, developed_asia]
+  min_region_coverage: 0.8
+
+schedule:
+  local_time: '23:30'
+  timezone: Europe/Warsaw
+
+report:
+  min_key_takeaways: 3
+  max_key_takeaways: 5
+  max_featured_events: 5
+  fx_reporting_currency: PLN
+
+news:
+  lookback_hours: 36
+  max_items_per_feed: 40
+  feeds:
+    - {id: fed, name: Federal Reserve, url: 'https://www.federalreserve.gov/feeds/press_all.xml', tier: official, region: us}
+    - {id: sec, name: SEC, url: 'https://www.sec.gov/news/pressreleases.rss', tier: official, region: us}
+    - {id: ecb, name: ECB, url: 'https://www.ecb.europa.eu/rss/press.html', tier: official, region: developed_europe}
+    - {id: boe, name: Bank of England, url: 'https://www.bankofengland.co.uk/rss/news', tier: official, region: developed_europe}
+    - {id: boj, name: Bank of Japan, url: 'https://www.boj.or.jp/en/rss/whatsnew.xml', tier: official, region: developed_asia}
+
+llm:
+  provider: template
+
+price_history_days: 400
+
+instruments:
+  # --- Benchmarki / ETF-y regionalne (notowane w USA = proxy, sesja USA, USD) ---
+  - {symbol: SPY, name: SPDR S&P 500 ETF, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
+  - {symbol: QQQ, name: Invesco QQQ (Nasdaq-100), kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
+  - {symbol: XLF, name: Financial Select Sector SPDR, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], role: benchmark_only}
+  - symbol: SMH
+    name: VanEck Semiconductor ETF
+    kind: etf
+    region: us
+    currency: USD
+    exchange: XNYS
+    exposure_countries: [US, NL, TW]
+    role: benchmark_only
+    note: zawiera emitentów EM (np. Tajwan) — wyłącznie benchmark sektorowy
+  - {symbol: VGK, name: Vanguard FTSE Europe ETF, kind: etf, region: developed_europe, currency: USD, exchange: XNYS, exposure_countries: [GB, FR, DE, CH, NL, SE, DK, IT, ES, FI, BE, 'NO', IE, AT, PT], is_regional_proxy: true}
+  - {symbol: EWJ, name: iShares MSCI Japan ETF, kind: etf, region: developed_asia, currency: USD, exchange: XNYS, exposure_countries: [JP], is_regional_proxy: true}
+  - {symbol: EWC, name: iShares MSCI Canada ETF, kind: etf, region: other_developed, currency: USD, exchange: XNYS, exposure_countries: [CA], is_regional_proxy: true}
+  - {symbol: EWA, name: iShares MSCI Australia ETF, kind: etf, region: other_developed, currency: USD, exchange: XNYS, exposure_countries: [AU], is_regional_proxy: true}
+  - {symbol: GLD, name: SPDR Gold Shares, kind: etf, region: global, currency: USD, exchange: XNYS, exposure_countries: [], note: surowiec — cena globalna}
+
+  # --- Lokalne indeksy: verified=false, dopóki `market-digest doctor` nie potwierdzi symbolu ---
+  - {symbol: '^GSPC', name: 'S&P 500', kind: index, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], verified: false}
+  - {symbol: '^STOXX', name: STOXX Europe 600, kind: index, region: developed_europe, currency: EUR, exchange: XETR, exposure_countries: [GB, FR, DE, CH, NL, SE, DK, IT, ES, FI, BE, 'NO', IE, AT, PT], verified: false, note: 'kalendarz XETR jako przybliżenie'}
+  - {symbol: '^N225', name: Nikkei 225, kind: index, region: developed_asia, currency: JPY, exchange: XTKS, exposure_countries: [JP], verified: false}
+  - {symbol: '^GSPTSE', name: 'S&P/TSX Composite', kind: index, region: other_developed, currency: CAD, exchange: XTSE, exposure_countries: [CA], verified: false}
+  - {symbol: '^AXJO', name: 'S&P/ASX 200', kind: index, region: other_developed, currency: AUD, exchange: XASX, exposure_countries: [AU], verified: false}
+
+  # --- Spółki (kwalifikacja wg kraju emitenta, nie miejsca notowania) ---
+  - {symbol: NVDA, name: NVIDIA, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
+  - {symbol: MSFT, name: Microsoft, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
+  - {symbol: GOOGL, name: Alphabet, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
+  - {symbol: AMZN, name: Amazon, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
+  - {symbol: META, name: Meta Platforms, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
+  - {symbol: AMD, name: AMD, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: SMH}
+  - {symbol: AVGO, name: Broadcom, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: SMH}
+  - {symbol: JPM, name: JPMorgan Chase, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: XLF}
+  - {symbol: ASML, name: ASML (ADR), kind: equity, region: developed_europe, currency: USD, exchange: XNYS, issuer_country: NL, benchmark: VGK}
+  - {symbol: SAP, name: SAP (ADR), kind: equity, region: developed_europe, currency: USD, exchange: XNYS, issuer_country: DE, benchmark: VGK}
+  - {symbol: TM, name: Toyota (ADR), kind: equity, region: developed_asia, currency: USD, exchange: XNYS, issuer_country: JP, benchmark: EWJ}
+  - {symbol: RY, name: Royal Bank of Canada, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC}
+  - {symbol: CCJ, name: Cameco, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC}
+  - {symbol: BHP, name: BHP Group (ADR), kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: AU, benchmark: EWA}
+
+# Kursy FX do przeliczeń na PLN (nie oznaczają analizy rynku polskiego). Weryfikowane przez doctor.
+fx_pairs:
+  USD: 'USDPLN=X'
+  EUR: 'EURPLN=X'
+  JPY: 'JPYPLN=X'
+  CAD: 'CADPLN=X'
+  AUD: 'AUDPLN=X'
