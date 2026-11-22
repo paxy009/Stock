@@ -57,7 +57,8 @@ def _published(entry: Any) -> datetime | None:
     for key in ("published_parsed", "updated_parsed"):
         st = entry.get(key)
         if st:
-            return datetime(*st[:6], tzinfo=UTC)
+            y, mo, d, h, mi, s = (int(x) for x in st[:6])
+            return datetime(y, mo, d, h, mi, s, tzinfo=UTC)
     return None
 
 
