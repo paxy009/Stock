@@ -1,0 +1,38 @@
+name: Report (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-digest-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: market-digest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: market-digest/pyproject.toml
+      - run: pip install -e .
+      - name: Doctor (symbole i kwalifikacja)
+        run: market-digest doctor | tee doctor.txt
+      - name: Generate report
+        run: market-digest run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-digest-report
+          path: |
+            market-digest/reports/*.md
+            market-digest/doctor.txt
+          retention-days: 30
