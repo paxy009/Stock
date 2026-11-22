@@ -37,10 +37,9 @@ Powtórny `run` z identycznymi danymi nie tworzy nowej wersji (porównanie finge
 
 ### Lokalne indeksy
 
-`^GSPC`, `^STOXX`, `^N225`, `^GSPTSE`, `^AXJO` mają w `config.yaml` ustawione `verified: false` i są
-pomijane (raport wymienia je w sekcji ograniczeń). Uruchom `market-digest doctor`, sprawdź, czy
-symbol zwraca właściwy instrument, i dopiero wtedy ustaw `verified: true`. Do tego czasu regiony
-reprezentują oznaczone ETF-y proxy notowane w USA (VGK, EWJ, EWC, EWA).
+`^GSPC`, `^STOXX`, `^N225`, `^GSPTSE`, `^AXJO` zostały potwierdzone przez `market-digest doctor`
+(2026-11-22) i są aktywne obok oznaczonych ETF-ów proxy (VGK, EWJ, EWC, EWA). Nowy symbol dodawaj
+z `verified: false`, sprawdź go przez `doctor` i dopiero wtedy włącz.
 
 ## Testy
 

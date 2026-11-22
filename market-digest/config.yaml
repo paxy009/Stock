@@ -1,4 +1,4 @@
-# Market Digest — konfiguracja Etapu 1.
+﻿# Market Digest — konfiguracja Etapu 1.
 # Sekrety NIE trafiają do tego pliku (Etap 2: GitHub Secrets / zmienne środowiskowe).
 
 app:
@@ -62,12 +62,12 @@ instruments:
   - {symbol: EWA, name: iShares MSCI Australia ETF, kind: etf, region: other_developed, currency: USD, exchange: XNYS, exposure_countries: [AU], is_regional_proxy: true}
   - {symbol: GLD, name: SPDR Gold Shares, kind: etf, region: global, currency: USD, exchange: XNYS, exposure_countries: [], note: surowiec — cena globalna}
 
-  # --- Lokalne indeksy: verified=false, dopóki `market-digest doctor` nie potwierdzi symbolu ---
-  - {symbol: '^GSPC', name: 'S&P 500', kind: index, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], verified: false}
-  - {symbol: '^STOXX', name: STOXX Europe 600, kind: index, region: developed_europe, currency: EUR, exchange: XETR, exposure_countries: [GB, FR, DE, CH, NL, SE, DK, IT, ES, FI, BE, 'NO', IE, AT, PT], verified: false, note: 'kalendarz XETR jako przybliżenie'}
-  - {symbol: '^N225', name: Nikkei 225, kind: index, region: developed_asia, currency: JPY, exchange: XTKS, exposure_countries: [JP], verified: false}
-  - {symbol: '^GSPTSE', name: 'S&P/TSX Composite', kind: index, region: other_developed, currency: CAD, exchange: XTSE, exposure_countries: [CA], verified: false}
-  - {symbol: '^AXJO', name: 'S&P/ASX 200', kind: index, region: other_developed, currency: AUD, exchange: XASX, exposure_countries: [AU], verified: false}
+  # --- Lokalne indeksy (symbole Yahoo potwierdzone przez doctor 2026-11-22) ---
+  - {symbol: '^GSPC', name: 'S&P 500', kind: index, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
+  - {symbol: '^STOXX', name: STOXX Europe 600, kind: index, region: developed_europe, currency: EUR, exchange: XETR, exposure_countries: [GB, FR, DE, CH, NL, SE, DK, IT, ES, FI, BE, 'NO', IE, AT, PT], note: 'kalendarz XETR jako przybliżenie'}
+  - {symbol: '^N225', name: Nikkei 225, kind: index, region: developed_asia, currency: JPY, exchange: XTKS, exposure_countries: [JP]}
+  - {symbol: '^GSPTSE', name: 'S&P/TSX Composite', kind: index, region: other_developed, currency: CAD, exchange: XTSE, exposure_countries: [CA]}
+  - {symbol: '^AXJO', name: 'S&P/ASX 200', kind: index, region: other_developed, currency: AUD, exchange: XASX, exposure_countries: [AU]}
 
   # --- Spółki (kwalifikacja wg kraju emitenta, nie miejsca notowania) ---
   - {symbol: NVDA, name: NVIDIA, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
