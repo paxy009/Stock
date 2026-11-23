@@ -20,7 +20,7 @@ def pct(v: float | None) -> str:
 
 
 def pp(v: float | None) -> str:
-    return NA if v is None else f"{v:+.2f} p.p.".replace(".", ",", 1)
+    return NA if v is None else f"{v:+.2f} p.p".replace(".", ",", 1)
 
 
 def num(v: float | None) -> str:

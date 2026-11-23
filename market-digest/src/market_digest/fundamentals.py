@@ -151,7 +151,12 @@ def extract(ticker: str, name: str, cik: int, facts: Sequence[Fact],
 
     cfo_all = latest_per_period(_by_concepts(facts, CFO))
     fcf = fcf_start = fcf_end = None
-    for (start, end), c in sorted(cfo_all.items(), key=lambda kv: kv[0][1], reverse=True):
+    # Same window convention for all issuers: latest end date, prefer fiscal YTD (<1y) over
+    # trailing-12M windows that some filers (e.g. AMZN) also tag in 10-Q.
+    ranked = sorted(cfo_all.items(),
+                    key=lambda kv: (kv[0][1], (kv[1].days or 999) < 350, kv[1].days or 0),
+                    reverse=True)
+    for (start, end), c in ranked:
         capex = _exact(facts, CAPEX, start, end)
         if capex is not None:
             fcf, fcf_start, fcf_end = c.val - capex.val, start, end
@@ -165,8 +170,11 @@ def extract(ticker: str, name: str, cik: int, facts: Sequence[Fact],
         flags.append("EPS TTM ≤ 0 — P/E nie ma sensu")
     elif ttm is not None and last_close is not None:
         pe = last_close / ttm
-    if ttm_note:
+    # The standard FY+YTD approximation is described in the methodology note; flag only deviations.
+    if ttm_note and not ttm_note.startswith("TTM ≈"):
         flags.append(ttm_note)
+    if ni is None:
+        flags.append("zysk netto: brak NetIncomeLoss dla tego okresu")
     return Fundamentals(
         ticker=ticker, name=name, cik=cik, period_kind=_kind(rev.days),
         period_start=rev.start, period_end=rev.end, form=rev.form, filed=rev.filed,

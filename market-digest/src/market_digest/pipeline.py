@@ -379,7 +379,11 @@ def _facts_from_cache(payload: str) -> list[Fact]:
 
 ITEM_LABELS = {"2.02": "wyniki finansowe", "5.02": "zmiany w zarządzie/radzie",
                "1.01": "istotna umowa", "8.01": "inne zdarzenia", "7.01": "Reg FD",
-               "2.01": "przejęcie/zbycie aktywów", "1.05": "incydent cyberbezpieczeństwa"}
+               "2.01": "przejęcie/zbycie aktywów", "1.05": "incydent cyberbezpieczeństwa",
+               "5.03": "zmiana statutu/regulaminu", "5.07": "głosowanie akcjonariuszy",
+               "2.03": "nowe zobowiązanie finansowe", "3.02": "niezarejestrowana emisja akcji",
+               "2.05": "koszty restrukturyzacji", "2.06": "odpisy z tytułu utraty wartości",
+               "4.02": "nieaktualność wcześniejszych sprawozdań"}
 
 
 def build_official(cfg: Config, storage: Storage, now_utc: datetime,

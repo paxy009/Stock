@@ -216,3 +216,16 @@ def test_foreign_adr_not_queried_in_sec(tmp_path: Any) -> None:
 
     cfg = make_config(tmp_path)
     assert [i.symbol for i in pipeline.sec_eligible(cfg)] == ["NVDA"]  # TSM (TW) excluded
+
+
+def test_fcf_prefers_fiscal_ytd_over_trailing_12m() -> None:
+    facts = [
+        F("Revenues", "2026-07-01", "2026-09-30", 10.0),
+        F("NetCashProvidedByUsedInOperatingActivities", "2025-10-01", "2026-09-30", 100.0),
+        F("PaymentsToAcquirePropertyPlantAndEquipment", "2025-10-01", "2026-09-30", 150.0),
+        F("NetCashProvidedByUsedInOperatingActivities", "2026-01-01", "2026-09-30", 70.0),
+        F("PaymentsToAcquirePropertyPlantAndEquipment", "2026-01-01", "2026-09-30", 60.0),
+    ]
+    f = extract("AMZN", "Amazon", 1, facts, None)
+    assert f.fcf == pytest.approx(10.0)
+    assert f.fcf_start == date(2026, 1, 1)
