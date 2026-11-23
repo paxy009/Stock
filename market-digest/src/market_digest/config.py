@@ -107,7 +107,7 @@ class DeliveryConfig(_Strict):
     smtp_username_env: str = "SMTP_USERNAME"
     smtp_password_env: str = "SMTP_PASSWORD"
     recipient_env: str = "DIGEST_RECIPIENT_EMAIL"
-    retries: int = Field(3, ge=1, le=10)
+    retries: int = Field(default=3, ge=1, le=10)
     retry_delay_seconds: float = 10.0
     timeout_seconds: float = 30.0
 
@@ -119,7 +119,7 @@ class Config(_Strict):
     report: ReportConfig = ReportConfig()
     news: NewsConfig = NewsConfig()
     llm: LlmConfig = LlmConfig()
-    delivery: DeliveryConfig = DeliveryConfig()
+    delivery: DeliveryConfig = Field(default_factory=DeliveryConfig)
     price_history_days: int = 400
     instruments: tuple[InstrumentConfig, ...]
     fx_pairs: dict[str, str] = Field(default_factory=dict)  # "USD" -> "USDPLN=X"
