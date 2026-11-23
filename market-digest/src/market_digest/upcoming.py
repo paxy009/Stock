@@ -11,6 +11,8 @@ from datetime import date, datetime, timedelta
 MONTHS = {m: i for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july", "august", "september",
      "october", "november", "december"], start=1)}
+# Fed uses abbreviations for meetings spanning two months, e.g. "Jan/Feb", "Apr/May".
+MONTHS3 = {name[:3]: num for name, num in MONTHS.items()}
 FOMC_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 ECB_URL = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
 
@@ -40,7 +42,7 @@ def parse_fomc(page: str) -> list[UpcomingEvent]:
         year = int(m.group(1))
         chunk = page[m.end(): marks[i + 1].start() if i + 1 < len(marks) else len(page)]
         for month_txt, days_txt in _FOMC_ROW.findall(chunk):
-            months = [MONTHS.get(x.strip().lower()) for x in month_txt.split("/")]
+            months = [MONTHS3.get(x.strip().lower()[:3]) for x in month_txt.split("/")]
             nums = [int(x) for x in re.findall(r"\d+", days_txt)]
             if not nums or None in months:
                 continue

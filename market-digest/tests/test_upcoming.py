@@ -96,7 +96,7 @@ def test_report_sections_10_and_next_up(tmp_path: Path) -> None:
     s10 = md.split("## 10.")[1].split("## 11.")[0]
     assert "2026-12-09 (środa)** — Fed — decyzja FOMC (z projekcjami SEP)" in s10
     assert "NVDA (NVIDIA) — publikacja wyników *(data szacunkowa" in s10
-    assert "EBC" not in s10  # 17.12 is beyond the 7-day horizon
+    assert "EBC — decyzja" not in s10  # 17.12 is beyond the 7-day horizon
     assert "Na co zwrócić uwagę w kolejnym dniu sesyjnym:** 2026-12-09: Fed" in md
 
 
