@@ -214,6 +214,11 @@ def plain(v: float | None, digits: int = 2) -> str:
     return NA if v is None else f"{v:.{digits}f}".replace(".", ",")
 
 
+def margin_txt(v: float | None) -> str:
+    """A margin is a level, not a change: no leading '+'."""
+    return NA if v is None else f"{v:.2f}%".replace(".", ",")
+
+
 def _render_fundamentals(ev: EvidencePackage, w: Callable[[str], None]) -> None:
     w("## 4. Wyniki finansowe, wyceny i jakość biznesu")
     w("")
@@ -230,7 +235,7 @@ def _render_fundamentals(ev: EvidencePackage, w: Callable[[str], None]) -> None:
         pe = plain(f.pe_ttm, 1) if f.pe_ttm is not None else (
             "n/d (EPS ≤ 0)" if f.eps_ttm is not None and f.eps_ttm <= 0 else NA)
         w(f"| [{f.ticker}]({f.source_url}) | {kind} {_d(f.period_end)} | {money(f.revenue)} | "
-          f"{pct(f.revenue_yoy)} | {money(f.net_income)} | {pct(f.net_margin)} | "
+          f"{pct(f.revenue_yoy)} | {money(f.net_income)} | {margin_txt(f.net_margin)} | "
           f"{plain(f.eps_diluted)} | {fcf} | {pe} | {f.form or NA} {_d(f.filed)} |")
     w("")
     w("*Dane raportowane (US-GAAP, XBRL z SEC EDGAR), nie prognozy. r/r = ten sam okres rok "
@@ -350,6 +355,7 @@ SECTOR_LABELS = {"commodities": "Surowce (kontrakty terminowe)", "energy": "Ener
                  "banks": "Banki / finanse", "uranium": "Uran i energetyka jądrowa"}
 SIGNIFICANT_1D = 2.0
 SIGNIFICANT_5D = 5.0
+MAX_SIGNIFICANT = 5
 
 
 def _significant(r: InstrumentRow) -> bool:
@@ -377,12 +383,15 @@ def _render_sectors(ev: EvidencePackage, w: Callable[[str], None]) -> None:
           f"{num(m.last_close)} | {pct(m.ret_1d)} | {pct(m.ret_5d)} | {pct(m.ret_21d)} | "
           f"{pct(m.ret_ytd)} | {_d(m.last_session)} |")
     w("")
-    sig = [r for r in rows if _significant(r)]
+    sig = sorted((r for r in rows if _significant(r)), key=lambda x: -abs(x.metrics.ret_5d or 0.0))
     if sig:
+        top = sig[:MAX_SIGNIFICANT]
         parts = [f"{r.symbol} {pct(r.metrics.ret_1d)} (1 sesja), {pct(r.metrics.ret_5d)} (5 sesji)"
-                 for r in sorted(sig, key=lambda x: -abs(x.metrics.ret_5d or 0.0))]
-        w(f"**Istotne ruchy** (próg: ±{SIGNIFICANT_1D:.0f}% w 1 sesji lub ±{SIGNIFICANT_5D:.0f}% "
-          f"w 5 sesjach): " + "; ".join(parts) + ". Przyczyny nie zostały zweryfikowane.")
+                 for r in top]
+        more = f" (+{len(sig) - len(top)} kolejnych w tabeli)" if len(sig) > len(top) else ""
+        w(f"**Największe ruchy** ({len(sig)}/{len(rows)} instrumentów przekracza próg ±"
+          f"{SIGNIFICANT_1D:.0f}% w 1 sesji lub ±{SIGNIFICANT_5D:.0f}% w 5 sesjach): "
+          + "; ".join(parts) + more + ". Przyczyny nie zostały zweryfikowane.")
     else:
         w(f"Brak istotnych ruchów w sektorach (próg: ±{SIGNIFICANT_1D:.0f}% w 1 sesji lub "
           f"±{SIGNIFICANT_5D:.0f}% w 5 sesjach).")

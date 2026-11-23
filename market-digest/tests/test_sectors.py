@@ -44,7 +44,7 @@ def test_section_7_table_and_significant_move(tmp_path: Path) -> None:
     assert "| Surowce (kontrakty terminowe) | Ropa WTI (CL=F) · kontrakt ciągły | USD |" in s7
     assert "| Energia | Energy SPDR (XLE) · ETF |" in s7
     assert "| Uran i energetyka jądrowa | Cameco (CCJ) |" in s7
-    assert "**Istotne ruchy**" in s7 and "CL=F -5,00%" in s7
+    assert "**Największe ruchy** (1/" in s7 and "CL=F -5,00%" in s7
     assert "nie są ceną spot" in s7
 
 

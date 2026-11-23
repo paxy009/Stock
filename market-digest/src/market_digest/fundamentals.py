@@ -163,6 +163,9 @@ def extract(ticker: str, name: str, cik: int, facts: Sequence[Fact],
             break
     if fcf is None:
         flags.append("FCF: brak spójnych CFO i CapEx")
+    elif fcf_end is not None and rev.end is not None and fcf_end < rev.end:
+        flags.append(f"FCF z wcześniejszego okresu (do {fcf_end.isoformat()}) — brak CapEx "
+                     "dla najnowszego okresu")
 
     ttm, ttm_note = eps_ttm(facts)
     pe = None

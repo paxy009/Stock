@@ -229,3 +229,17 @@ def test_fcf_prefers_fiscal_ytd_over_trailing_12m() -> None:
     f = extract("AMZN", "Amazon", 1, facts, None)
     assert f.fcf == pytest.approx(10.0)
     assert f.fcf_start == date(2026, 1, 1)
+
+
+def test_stale_fcf_period_is_flagged() -> None:
+    facts = [
+        F("Revenues", "2026-07-01", "2026-09-30", 10.0),
+        F("NetCashProvidedByUsedInOperatingActivities", "2026-01-01", "2026-09-30", 5.0),
+        F("NetCashProvidedByUsedInOperatingActivities", "2025-01-01", "2025-12-31", 8.0,
+          form="10-K"),
+        F("PaymentsToAcquirePropertyPlantAndEquipment", "2025-01-01", "2025-12-31", 3.0,
+          form="10-K"),
+    ]
+    f = extract("UUUU", "Energy Fuels", 1, facts, None)
+    assert f.fcf == 5.0 and f.fcf_end == date(2025, 12, 31)
+    assert any("wcześniejszego okresu" in fl for fl in f.flags)
