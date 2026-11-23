@@ -33,7 +33,8 @@ class TemplateProvider:
 
         by_region: dict[str, list[str]] = {}
         for row in evidence.rows:
-            if row.eligibility != "eligible" or row.kind not in ("etf", "index"):
+            if (row.eligibility != "eligible" or row.kind not in ("etf", "index")
+                    or row.sector is not None):
                 continue
             if row.metrics.ret_1d is None:
                 continue

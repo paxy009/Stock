@@ -104,7 +104,8 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     w("| Region / instrument | Waluta / baza | Ostatni kurs | 1 sesja | 5 sesji | 21 sesji | YTD "
       "| Od szczytu 52 tyg. | 21 sesji w PLN | Dane z |")
     w("|---|---|---:|---:|---:|---:|---:|---:|---:|---|")
-    snapshot = [r for r in ev.rows if r.kind in ("etf", "index") and r.eligibility == "eligible"]
+    snapshot = [r for r in ev.rows if r.kind in ("etf", "index") and r.eligibility == "eligible"
+                and r.sector is None]
     snapshot.sort(key=lambda r: (REGION_ORDER.index(r.region), r.kind != "index", r.symbol))
     for r in snapshot:
         w(_row(r))
@@ -146,9 +147,13 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         w("")
     _render_fundamentals(ev, w)
     _render_macro(ev, w)
-    for title in ("6. AI, infrastruktura i przewaga konkurencyjna",
-                  "7. Sektory dodatkowe: uran, energia, banki, surowce",
-                  "8. Główne scenariusze: wzrostowy, neutralny, spadkowy",
+    for title in ("6. AI, infrastruktura i przewaga konkurencyjna",):
+        w(f"## {title}")
+        w("")
+        w(UNAVAILABLE)
+        w("")
+    _render_sectors(ev, w)
+    for title in ("8. Główne scenariusze: wzrostowy, neutralny, spadkowy",
                   "9. Opinie z internetu — fact-check"):
         w(f"## {title}")
         w("")
@@ -338,4 +343,52 @@ def _render_upcoming(ev: EvidencePackage, w: Callable[[str], None]) -> None:
     w("")
     w("*Daty posiedzeń Fed/EBC z oficjalnych kalendarzy; daty wyników spółek z Yahoo Finance są "
       "szacunkowe, dopóki spółka ich nie potwierdzi. Dni bez sesji wg exchange_calendars.*")
+    w("")
+
+
+SECTOR_LABELS = {"commodities": "Surowce (kontrakty terminowe)", "energy": "Energia",
+                 "banks": "Banki / finanse", "uranium": "Uran i energetyka jądrowa"}
+SIGNIFICANT_1D = 2.0
+SIGNIFICANT_5D = 5.0
+
+
+def _significant(r: InstrumentRow) -> bool:
+    m = r.metrics
+    return ((m.ret_1d is not None and abs(m.ret_1d) >= SIGNIFICANT_1D)
+            or (m.ret_5d is not None and abs(m.ret_5d) >= SIGNIFICANT_5D))
+
+
+def _render_sectors(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 7. Sektory dodatkowe: uran, energia, banki, surowce")
+    w("")
+    rows = [r for r in ev.rows if r.sector in SECTOR_LABELS
+            and r.eligibility in ("eligible", "benchmark_only") and r.metrics.last_close is not None]
+    if not rows:
+        w("Brak danych sektorowych w tym przebiegu.")
+        w("")
+        return
+    w("| Sektor | Instrument | Waluta | Ostatni kurs | 1 sesja | 5 sesji | 21 sesji | YTD | Dane z |")
+    w("|---|---|---|---:|---:|---:|---:|---:|---|")
+    order = list(SECTOR_LABELS)
+    for r in sorted(rows, key=lambda x: (order.index(x.sector or ""), x.kind != "future", x.symbol)):
+        m = r.metrics
+        kind = " · kontrakt ciągły" if r.kind == "future" else (" · ETF" if r.kind == "etf" else "")
+        w(f"| {SECTOR_LABELS[r.sector or '']} | {r.name} ({r.symbol}){kind} | {r.currency} | "
+          f"{num(m.last_close)} | {pct(m.ret_1d)} | {pct(m.ret_5d)} | {pct(m.ret_21d)} | "
+          f"{pct(m.ret_ytd)} | {_d(m.last_session)} |")
+    w("")
+    sig = [r for r in rows if _significant(r)]
+    if sig:
+        parts = [f"{r.symbol} {pct(r.metrics.ret_1d)} (1 sesja), {pct(r.metrics.ret_5d)} (5 sesji)"
+                 for r in sorted(sig, key=lambda x: -abs(x.metrics.ret_5d or 0.0))]
+        w(f"**Istotne ruchy** (próg: ±{SIGNIFICANT_1D:.0f}% w 1 sesji lub ±{SIGNIFICANT_5D:.0f}% "
+          f"w 5 sesjach): " + "; ".join(parts) + ". Przyczyny nie zostały zweryfikowane.")
+    else:
+        w(f"Brak istotnych ruchów w sektorach (próg: ±{SIGNIFICANT_1D:.0f}% w 1 sesji lub "
+          f"±{SIGNIFICANT_5D:.0f}% w 5 sesjach).")
+    w("")
+    w("*Kontrakty ciągłe (=F) zawierają efekt rolowania serii i nie są ceną spot. Cena akcji "
+      "spółek uranowych to nie cena uranu — notowania U3O8 nie są dostępne w darmowych źródłach. "
+      "XLF to cały sektor finansowy USA, nie tylko banki. ETF-y z istotnym udziałem emitentów EM "
+      "(np. URA) są wyłączone z zakresu.*")
     w("")

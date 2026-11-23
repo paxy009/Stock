@@ -132,6 +132,7 @@ def build_evidence(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc:
             currency=inst.currency, exchange=inst.exchange, is_regional_proxy=inst.is_regional_proxy,
             eligibility=elig.status.value, eligibility_reason=elig.reason, benchmark=inst.benchmark,
             metrics=m, rel_1d_vs_benchmark=None, source_id=source_id, source_url=YAHOO_URL,
+            sector=inst.sector,
         )
         pending.append((row, inst.benchmark))
     for row, bench in pending:

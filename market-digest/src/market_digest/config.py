@@ -53,6 +53,7 @@ class InstrumentConfig(_Strict):
     exposure_countries: frozenset[str] | None = None  # ETF/index mandate
     is_regional_proxy: bool = False
     benchmark: str | None = None
+    sector: Literal["commodities", "energy", "banks", "uranium"] | None = None  # section 7
     verified: bool = True  # provider symbol confirmed (doctor)
     eligibility_override: Literal["requires_review", "excluded"] | None = None
     note: str | None = None

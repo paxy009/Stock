@@ -38,6 +38,7 @@ class InstrumentRow:
     rel_1d_vs_benchmark: float | None
     source_id: str
     source_url: str
+    sector: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -61,6 +61,19 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 7: sektory (surowce, energia, banki, uran)
+
+Instrumenty z polem `sector` w `config.yaml` (symbole sprawdzone w Yahoo 2026-11-23):
+- **Surowce:** ropa WTI i Brent, gaz, złoto, srebro, miedź (kontrakty ciągłe `=F`) oraz GLD.
+- **Energia:** XLE (benchmark).
+- **Banki:** XLF, EUFN (benchmarki), JPM, RY.
+- **Uran:** CCJ, UUUU, NXE. URA nie jest dodany, bo ma duży udział emitentów spoza rynków
+  rozwiniętych.
+
+Tabela pokazuje zmianę z 1 i 5 sesji, 21 sesji oraz YTD. Raport wyróżnia ruchy ≥ ±2% w 1 sesji
+lub ≥ ±5% w 5 sesjach, bez przypisywania przyczyn. Instrumenty sektorowe nie trafiają do
+tabeli w sekcji 1 ani do TL;DR i nie wpływają na status `complete`/`partial`.
+
 ## Sekcja 10: kalendarz wydarzeń
 
 - **Posiedzenia Fed (FOMC) i EBC:** daty z oficjalnych stron. Raport podaje dzień decyzji, czyli

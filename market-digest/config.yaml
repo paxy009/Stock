@@ -75,7 +75,7 @@ instruments:
   # --- Benchmarki / ETF-y regionalne (notowane w USA = proxy, sesja USA, USD) ---
   - {symbol: SPY, name: SPDR S&P 500 ETF, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
   - {symbol: QQQ, name: Invesco QQQ (Nasdaq-100), kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
-  - {symbol: XLF, name: Financial Select Sector SPDR, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], role: benchmark_only}
+  - {symbol: XLF, name: Financial Select Sector SPDR, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], role: benchmark_only, sector: banks}
   - symbol: SMH
     name: VanEck Semiconductor ETF
     kind: etf
@@ -89,7 +89,7 @@ instruments:
   - {symbol: EWJ, name: iShares MSCI Japan ETF, kind: etf, region: developed_asia, currency: USD, exchange: XNYS, exposure_countries: [JP], is_regional_proxy: true}
   - {symbol: EWC, name: iShares MSCI Canada ETF, kind: etf, region: other_developed, currency: USD, exchange: XNYS, exposure_countries: [CA], is_regional_proxy: true}
   - {symbol: EWA, name: iShares MSCI Australia ETF, kind: etf, region: other_developed, currency: USD, exchange: XNYS, exposure_countries: [AU], is_regional_proxy: true}
-  - {symbol: GLD, name: SPDR Gold Shares, kind: etf, region: global, currency: USD, exchange: XNYS, exposure_countries: [], note: surowiec — cena globalna}
+  - {symbol: GLD, name: SPDR Gold Shares, kind: etf, region: global, currency: USD, exchange: XNYS, exposure_countries: [], sector: commodities, note: surowiec — cena globalna}
 
   # --- Lokalne indeksy (symbole Yahoo potwierdzone przez doctor 2026-11-22) ---
   - {symbol: '^GSPC', name: 'S&P 500', kind: index, region: us, currency: USD, exchange: XNYS, exposure_countries: [US]}
@@ -106,13 +106,26 @@ instruments:
   - {symbol: META, name: Meta Platforms, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: QQQ}
   - {symbol: AMD, name: AMD, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: SMH}
   - {symbol: AVGO, name: Broadcom, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: SMH}
-  - {symbol: JPM, name: JPMorgan Chase, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: XLF}
+  - {symbol: JPM, name: JPMorgan Chase, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, benchmark: XLF, sector: banks}
   - {symbol: ASML, name: ASML (ADR), kind: equity, region: developed_europe, currency: USD, exchange: XNYS, issuer_country: NL, benchmark: VGK}
   - {symbol: SAP, name: SAP (ADR), kind: equity, region: developed_europe, currency: USD, exchange: XNYS, issuer_country: DE, benchmark: VGK}
   - {symbol: TM, name: Toyota (ADR), kind: equity, region: developed_asia, currency: USD, exchange: XNYS, issuer_country: JP, benchmark: EWJ}
-  - {symbol: RY, name: Royal Bank of Canada, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC}
-  - {symbol: CCJ, name: Cameco, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC}
+  - {symbol: RY, name: Royal Bank of Canada, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC, sector: banks}
+  - {symbol: CCJ, name: Cameco, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, benchmark: EWC, sector: uranium}
   - {symbol: BHP, name: BHP Group (ADR), kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: AU, benchmark: EWA}
+
+  # --- Sektory (sekcja 7). Symbole zweryfikowane w Yahoo 2026-11-23. Futures: ciągłe serie, kalendarz XNYS jako przybliżenie daty sesji. ---
+  - {symbol: 'CL=F', name: Ropa WTI, kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: 'BZ=F', name: Ropa Brent, kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: 'NG=F', name: Gaz ziemny (Henry Hub), kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: 'GC=F', name: Złoto, kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: 'SI=F', name: Srebro, kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: 'HG=F', name: Miedź, kind: future, region: global, currency: USD, exchange: XNYS, sector: commodities}
+  - {symbol: XLE, name: Energy Select Sector SPDR, kind: etf, region: us, currency: USD, exchange: XNYS, exposure_countries: [US], role: benchmark_only, sector: energy}
+  - {symbol: EUFN, name: iShares MSCI Europe Financials, kind: etf, region: developed_europe, currency: USD, exchange: XNYS, exposure_countries: [GB, FR, DE, CH, NL, SE, DK, IT, ES, FI, BE, 'NO', IE, AT, PT], role: benchmark_only, sector: banks}
+  - {symbol: UUUU, name: Energy Fuels, kind: equity, region: us, currency: USD, exchange: XNYS, issuer_country: US, sector: uranium}
+  - {symbol: NXE, name: NexGen Energy, kind: equity, region: other_developed, currency: USD, exchange: XNYS, issuer_country: CA, sector: uranium}
+  # URA (Global X Uranium) — nie dodano: istotny udział emitentów spoza DM (np. Kazachstan).
 
 # Kursy FX do przeliczeń na PLN (nie oznaczają analizy rynku polskiego). Weryfikowane przez doctor.
 fx_pairs:
