@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from zoneinfo import ZoneInfo
 
@@ -132,9 +133,9 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         extra = f" (+{len(e.items) - 1} powiązanych)" if len(e.items) > 1 else ""
         w(f"- **Źródło:** [{e.source_name}]({e.url}){extra}")
         w("")
-    for title in ("4. Wyniki finansowe, wyceny i jakość biznesu",
-                  "5. Makro — USA i pozostałe rynki rozwinięte",
-                  "6. AI, infrastruktura i przewaga konkurencyjna",
+    _render_fundamentals(ev, w)
+    _render_macro(ev, w)
+    for title in ("6. AI, infrastruktura i przewaga konkurencyjna",
                   "7. Sektory dodatkowe: uran, energia, banki, surowce",
                   "8. Główne scenariusze: wzrostowy, neutralny, spadkowy",
                   "9. Opinie z internetu — fact-check",
@@ -178,3 +179,83 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
       "wymagają samodzielnej oceny ryzyka.*")
     w("")
     return "\n".join(out)
+
+
+def money(v: float | None) -> str:
+    if v is None:
+        return NA
+    a = abs(v)
+    if a >= 1e9:
+        s = f"{v / 1e9:,.1f} mld"
+    elif a >= 1e6:
+        s = f"{v / 1e6:,.1f} mln"
+    else:
+        s = f"{v:,.0f}"
+    return s.replace(",", " ").replace(".", ",") + " USD"
+
+
+def plain(v: float | None, digits: int = 2) -> str:
+    return NA if v is None else f"{v:.{digits}f}".replace(".", ",")
+
+
+def _render_fundamentals(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 4. Wyniki finansowe, wyceny i jakość biznesu")
+    w("")
+    if not ev.fundamentals:
+        w("Brak danych SEC w tym przebiegu (moduł wyłączony lub źródło niedostępne).")
+        w("")
+        return
+    w("| Spółka | Okres (koniec) | Przychody | r/r | Zysk netto | Marża netto | EPS rozw. "
+      "| FCF (okres) | P/E TTM | Zgłoszenie |")
+    w("|---|---|---:|---:|---:|---:|---:|---:|---:|---|")
+    for f in sorted(ev.fundamentals, key=lambda x: x.ticker):
+        kind = {"quarter": "kw.", "annual": "rok"}.get(f.period_kind or "", "?")
+        fcf = (f"{money(f.fcf)} ({_d(f.fcf_start)}→{_d(f.fcf_end)})" if f.fcf is not None else NA)
+        pe = plain(f.pe_ttm, 1) if f.pe_ttm is not None else (
+            "n/d (EPS ≤ 0)" if f.eps_ttm is not None and f.eps_ttm <= 0 else NA)
+        w(f"| [{f.ticker}]({f.source_url}) | {kind} {_d(f.period_end)} | {money(f.revenue)} | "
+          f"{pct(f.revenue_yoy)} | {money(f.net_income)} | {pct(f.net_margin)} | "
+          f"{plain(f.eps_diluted)} | {fcf} | {pe} | {f.form or NA} {_d(f.filed)} |")
+    w("")
+    w("*Dane raportowane (US-GAAP, XBRL z SEC EDGAR), nie prognozy. r/r = ten sam okres rok "
+      "wcześniej. FCF = CFO − CapEx za ten sam okres (YTD w 10-Q), może różnić się od non-GAAP "
+      "FCF spółki. P/E TTM = ostatnie zamknięcie / EPS rozwodniony z 4 kwartałów (przybliżenie); "
+      "przy EPS ≤ 0 nie podajemy P/E. ADR-y emitentów zagranicznych (20-F/IFRS) nie są objęte.*")
+    notes = [f"{f.ticker}: {'; '.join(f.flags)}" for f in ev.fundamentals if f.flags]
+    if notes:
+        w("")
+        w("**Uwagi do danych:** " + " · ".join(sorted(notes)))
+    w("")
+    w("### Nowe zgłoszenia 8-K (ostatnie dni)")
+    w("")
+    if not ev.filings:
+        w("Brak nowych 8-K dla monitorowanych spółek z USA.")
+    for fl in ev.filings[:8]:
+        w(f"- **{fl['ticker']}** — {fl['filed']}: {fl['items']}. "
+          f"[8-K]({fl['url']}) *(zdarzenie raportowane, nie ocena jakości spółki)*")
+    w("")
+
+
+def _render_macro(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 5. Makro — USA i pozostałe rynki rozwinięte")
+    w("")
+    rows = [m for m in ev.macro if m.value is not None]
+    if not rows:
+        w("Brak danych makro w tym przebiegu (moduł wyłączony lub FRED niedostępny).")
+        w("")
+        return
+    w("| Wskaźnik | Region | Ostatnia wartość | Okres danych | Poprzednio | Zmiana | Źródło |")
+    w("|---|---|---:|---|---:|---:|---|")
+    for m in rows:
+        unit = "" if m.unit == "pkt" else " %"
+        chg = NA if m.change is None else (
+            f"{m.change:+.2f}".replace(".", ",") + (" p.p." if m.unit == "%" else ""))
+        w(f"| {m.name} | {REGION_LABELS.get(m.region, m.region)} | {plain(m.value)}{unit} | "
+          f"{_d(m.last_date)} | {plain(m.prev_value)}{unit if m.prev_value is not None else ''}"
+          f" ({_d(m.prev_date)}) | {chg} | [FRED {m.series_id}]({m.source_url}) |")
+    w("")
+    w("*„Okres danych” to okres, którego dotyczy obserwacja (dla danych miesięcznych — miesiąc), "
+      "nie data publikacji. Dane dzienne (stopy, rentowności, VIX) — ostatnia dostępna sesja. "
+      "CPI/PCE jako zmiana r/r indeksu. Oczekiwania rynku co do przyszłych stóp ≠ bieżąca "
+      "decyzja banku centralnego.*")
+    w("")

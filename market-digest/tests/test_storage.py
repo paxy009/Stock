@@ -11,7 +11,7 @@ def test_migrations_are_idempotent(tmp_path) -> None:  # type: ignore[no-untyped
     path = tmp_path / "db.sqlite"
     Storage(path).close()
     st = Storage(path)
-    assert st.schema_version() == 1
+    assert st.schema_version() == 2
 
 
 def test_price_upsert_does_not_duplicate() -> None:

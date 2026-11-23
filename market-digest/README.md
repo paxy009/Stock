@@ -61,6 +61,25 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Etap 3: SEC EDGAR + FRED
+
+- **Sekcja 4 (wyniki):** dla spółek z USA składających 10-Q/10-K, czyli NVDA, MSFT, GOOGL, AMZN,
+  META, AMD, AVGO i JPM. Raport pokazuje przychody i ich zmianę r/r, zysk netto, marżę, EPS
+  rozwodniony, FCF (CFO − CapEx za ten sam okres) i P/E TTM; przy EPS ≤ 0 P/E nie jest podawane.
+  Źródło to XBRL `companyfacts`; przy korekcie danych liczy się najnowsze zgłoszenie. Sekcja
+  pokazuje też nowe 8-K z ostatnich 7 dni wraz z opisem pozycji. ADR-y spółek zagranicznych
+  (ASML, SAP, TM, BHP) raportują w 20-F/IFRS i nie są objęte tym modułem.
+- **Sekcja 5 (makro):** serie FRED zdefiniowane w `config.yaml`: Fed funds, 2Y, 10Y, CPI i PCE
+  r/r, bezrobocie, VIX oraz stopa depozytowa ECB. Każda wartość ma okres danych, poprzednią
+  obserwację i zmianę.
+- **SEC fair access:** wymagany jest `SEC_USER_AGENT` z adresem e-mail. W workflow ustawiany jest
+  automatycznie z sekretu `SMTP_USERNAME`. Zapytania są ograniczone do ≤ 5 na sekundę, a dane
+  trzymane w cache (`official_cache`) przez 20 h.
+- **Awaria źródła:** raport używa ostatnich danych z cache i wymienia źródło w sekcji 11. Brak
+  danych SEC/FRED nie zmienia statusu `complete`/`partial`, bo ten zależy od pokrycia cen.
+- **Do dodania później:** sprawozdania emitentów spoza USA (EDINET, SEDAR+, ASX, IR) oraz serie
+  BoE, BoJ, BoC i RBA, po zweryfikowaniu źródeł i licencji.
+
 ## Etap 2: automatyzacja (GitHub Actions)
 
 | Workflow | Kiedy | Co robi |

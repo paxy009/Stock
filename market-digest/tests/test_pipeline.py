@@ -61,7 +61,8 @@ def test_full_report_offline(cfg: Config) -> None:
     assert "federalreserve.gov/x.htm" in md
     assert "boj (ConnectError)" in md
     assert "{{" not in md and "example.org" not in md
-    assert "Moduł niedostępny" in md
+    assert "Moduł niedostępny" in md  # sections 6-10
+    assert "## 4. Wyniki" in md and "Brak danych SEC" in md
     assert "niepotwierdzona" in md
 
 

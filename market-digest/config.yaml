@@ -40,6 +40,28 @@ news:
 llm:
   provider: template
 
+# Etap 3 — oficjalne źródła. SEC: tylko emitenci składający 10-Q/10-K (w praktyce spółki z USA);
+# ADR-y zagraniczne (ASML, SAP, TM, BHP) raportują w 20-F/IFRS i są poza tym modułem.
+fundamentals:
+  enabled: true
+  user_agent_env: SEC_USER_AGENT
+  refresh_hours: 20
+  filings_lookback_days: 7
+
+macro:
+  enabled: true
+  refresh_hours: 6
+  lookback_days: 800
+  series:
+    - {id: DFF, name: 'Fed — efektywna stopa funduszy federalnych', region: us, unit: '%'}
+    - {id: DGS2, name: 'US Treasury 2Y', region: us, unit: '%'}
+    - {id: DGS10, name: 'US Treasury 10Y', region: us, unit: '%'}
+    - {id: CPIAUCSL, name: 'CPI USA (r/r)', region: us, unit: '%', transform: yoy}
+    - {id: PCEPI, name: 'PCE USA (r/r)', region: us, unit: '%', transform: yoy}
+    - {id: UNRATE, name: 'Stopa bezrobocia USA', region: us, unit: '%'}
+    - {id: VIXCLS, name: 'VIX', region: us, unit: 'pkt'}
+    - {id: ECBDFR, name: 'ECB — stopa depozytowa', region: developed_europe, unit: '%'}
+
 price_history_days: 400
 
 instruments:

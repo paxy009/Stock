@@ -14,6 +14,7 @@ from market_digest.config import Config, load_config
 from market_digest.delivery import DeliveryConfigError, SmtpMailer, SmtpSettings
 from market_digest.eligibility import classify
 from market_digest.providers.news import RssProvider
+from market_digest.providers.official import HttpFred, HttpSec
 from market_digest.providers.prices import YFinanceProvider
 from market_digest.storage import Storage
 
@@ -37,12 +38,32 @@ def _now(at: str | None) -> datetime:
     return dt.astimezone(UTC)
 
 
+def _official_fetch(cfg: Config, st: Storage, now: datetime) -> dict[str, str]:
+    import os
+
+    sec = None
+    ua = os.environ.get(cfg.fundamentals.user_agent_env, "").strip()
+    if cfg.fundamentals.enabled:
+        if "@" in ua:
+            sec = HttpSec(ua)
+        else:
+            typer.echo(f"SEC pominięte: ustaw {cfg.fundamentals.user_agent_env} "
+                       "(np. 'market-digest twoj@email')", err=True)
+    fred = HttpFred() if cfg.macro.enabled else None
+    failed = pipeline.fetch_official(cfg, st, sec, fred, now)
+    if sec is None and cfg.fundamentals.enabled:
+        failed["sec"] = "brak SEC_USER_AGENT"
+    return failed
+
+
 @app.command()
 def fetch(config: Path = ConfigOpt, at: str | None = AtOpt) -> None:
-    """Pobierz ceny i RSS do SQLite."""
+    """Pobierz ceny, RSS, SEC i FRED do SQLite."""
     cfg, st = _setup(config)
+    now = _now(at)
     failed = pipeline.fetch(cfg, st, YFinanceProvider(), RssProvider(cfg.news.timeout_seconds,
-                            cfg.news.max_items_per_feed), _now(at))
+                            cfg.news.max_items_per_feed), now)
+    failed.update(_official_fetch(cfg, st, now))
     typer.echo(f"Pobrano. Niedostępne źródła: {failed or 'brak'}")
 
 
@@ -69,6 +90,7 @@ def run(config: Path = ConfigOpt, at: str | None = AtOpt,
         now = pipeline.scheduled_moment(now, cfg)
     failed = pipeline.fetch(cfg, st, YFinanceProvider(), RssProvider(cfg.news.timeout_seconds,
                             cfg.news.max_items_per_feed), now)
+    failed.update(_official_fetch(cfg, st, now))
     res = pipeline.generate(cfg, st, ExchangeCalendars(), now, failed_sources=failed, force=force)
     _print(res)
     if send:

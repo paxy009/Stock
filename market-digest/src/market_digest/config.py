@@ -112,6 +112,29 @@ class DeliveryConfig(_Strict):
     timeout_seconds: float = 30.0
 
 
+class MacroSeriesConfig(_Strict):
+    id: str
+    name: str
+    region: RegionId = "us"
+    unit: str = "%"
+    transform: Literal["level", "yoy"] = "level"
+
+
+class FundamentalsConfig(_Strict):
+    enabled: bool = False
+    # SEC fair access requires a declared contact; e-mail is read from this env var.
+    user_agent_env: str = "SEC_USER_AGENT"
+    refresh_hours: float = 20.0
+    filings_lookback_days: int = 7
+
+
+class MacroConfig(_Strict):
+    enabled: bool = False
+    refresh_hours: float = 6.0
+    lookback_days: int = 800
+    series: tuple[MacroSeriesConfig, ...] = ()
+
+
 class Config(_Strict):
     app: AppConfig = AppConfig()
     coverage: CoverageConfig
@@ -120,6 +143,8 @@ class Config(_Strict):
     news: NewsConfig = NewsConfig()
     llm: LlmConfig = LlmConfig()
     delivery: DeliveryConfig = Field(default_factory=DeliveryConfig)
+    fundamentals: FundamentalsConfig = Field(default_factory=FundamentalsConfig)
+    macro: MacroConfig = Field(default_factory=MacroConfig)
     price_history_days: int = 400
     instruments: tuple[InstrumentConfig, ...]
     fx_pairs: dict[str, str] = Field(default_factory=dict)  # "USD" -> "USDPLN=X"

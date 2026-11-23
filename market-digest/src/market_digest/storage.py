@@ -1,4 +1,4 @@
-"""SQLite storage with versioned migrations and idempotent upserts. Timestamps in UTC."""
+﻿"""SQLite storage with versioned migrations and idempotent upserts. Timestamps in UTC."""
 
 from __future__ import annotations
 
@@ -80,6 +80,21 @@ MIGRATIONS: list[str] = [
         delivery_id TEXT,
         last_attempt_at_utc TEXT,
         error_category TEXT
+    );
+    """,
+    """
+    CREATE TABLE official_cache (
+        cache_key TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        retrieved_at_utc TEXT NOT NULL
+    );
+    CREATE TABLE macro_observations (
+        series_id TEXT NOT NULL,
+        obs_date TEXT NOT NULL,
+        value REAL NOT NULL,
+        retrieved_at_utc TEXT NOT NULL,
+        PRIMARY KEY (series_id, obs_date)
     );
     """,
 ]
@@ -262,3 +277,36 @@ class Storage:
             "SELECT MAX(last_attempt_at_utc) FROM delivery_attempts WHERE status='sent'"
         ).fetchone()
         return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+    def put_cache(self, key: str, payload: str, source_url: str, at_utc: datetime) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO official_cache VALUES (?,?,?,?)",
+                (key, payload, source_url, _iso(at_utc)),
+            )
+
+    def get_cache(self, key: str) -> tuple[str, datetime] | None:
+        row = self.conn.execute(
+            "SELECT payload, retrieved_at_utc FROM official_cache WHERE cache_key=?", (key,)
+        ).fetchone()
+        return (str(row[0]), datetime.fromisoformat(row[1])) if row else None
+
+    def upsert_macro(self, series_id: str, obs: Iterable[tuple[date, float]],
+                     at_utc: datetime) -> int:
+        rows = [(series_id, d.isoformat(), v, _iso(at_utc)) for d, v in obs]
+        with self.conn:
+            self.conn.executemany(
+                "INSERT INTO macro_observations VALUES (?,?,?,?) "
+                "ON CONFLICT(series_id, obs_date) DO UPDATE SET value=excluded.value, "
+                "retrieved_at_utc=excluded.retrieved_at_utc",
+                rows,
+            )
+        return len(rows)
+
+    def load_macro(self, series_id: str) -> list[tuple[date, float]]:
+        return [
+            (date.fromisoformat(r[0]), float(r[1]))
+            for r in self.conn.execute(
+                "SELECT obs_date, value FROM macro_observations WHERE series_id=? "
+                "ORDER BY obs_date", (series_id,))
+        ]

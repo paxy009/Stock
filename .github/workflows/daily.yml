@@ -33,6 +33,7 @@ jobs:
       SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       DIGEST_RECIPIENT_EMAIL: ${{ secrets.DIGEST_RECIPIENT_EMAIL }}
+      SEC_USER_AGENT: market-digest ${{ secrets.SMTP_USERNAME }}
     steps:
       - uses: actions/checkout@v5
 

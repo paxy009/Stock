@@ -70,6 +70,9 @@ class EvidencePackage:
     sources: dict[str, str] = field(default_factory=dict)  # url allowlist: url -> label
     content_status: str = "complete"
     missing_regions: list[str] = field(default_factory=list)
+    fundamentals: list[Any] = field(default_factory=list)  # fundamentals.Fundamentals
+    filings: list[dict[str, str]] = field(default_factory=list)
+    macro: list[Any] = field(default_factory=list)  # macro.MacroRow
 
     def allowed_urls(self) -> set[str]:
         return set(self.sources)
@@ -87,6 +90,9 @@ class EvidencePackage:
             "failed": sorted(self.failed_sources),
             "excluded": _plain(self.excluded),
             "status": self.content_status,
+            "fundamentals": _plain([asdict(f) for f in self.fundamentals]),
+            "filings": _plain(self.filings),
+            "macro": _plain([asdict(m) for m in self.macro]),
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
 

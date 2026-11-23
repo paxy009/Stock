@@ -28,6 +28,8 @@ jobs:
       - name: Doctor (symbole i kwalifikacja)
         run: market-digest doctor | tee doctor.txt
       - name: Generate report
+        env:
+          SEC_USER_AGENT: market-digest ${{ secrets.SMTP_USERNAME }}
         run: market-digest run
       - uses: actions/upload-artifact@v4
         with:

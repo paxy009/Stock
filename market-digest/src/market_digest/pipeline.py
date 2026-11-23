@@ -3,25 +3,35 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import tempfile
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_t
 from pathlib import Path
 
 from market_digest import analytics
 from market_digest.calendar import SessionCalendar, local_date
-from market_digest.config import Config
+from market_digest.config import Config, InstrumentConfig
 from market_digest.delivery import Mailer, build_message, send_with_retry
 from market_digest.eligibility import classify
 from market_digest.events import group_events, rank_events
 from market_digest.evidence import EvidencePackage, InstrumentRow, RegionStatus, decide_status
+from market_digest.fundamentals import Fact, Fundamentals, extract
+from market_digest.macro import MacroObs, MacroRow, summarize
 from market_digest.models import Eligibility
 from market_digest.narrative import LLMProvider, TemplateProvider, compose_with_fallback
 from market_digest.providers.news import NewsProvider
+from market_digest.providers.official import (
+    SEC_TICKERS_URL,
+    FredProvider,
+    SecProvider,
+    parse_company_facts,
+    parse_recent_8k,
+)
 from market_digest.providers.prices import PriceProvider
 from market_digest.qa import validate_markdown
 from market_digest.renderer import render
@@ -174,6 +184,16 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
     started = datetime.now(UTC)
     run_id = uuid.uuid4().hex[:12]
     ev = build_evidence(cfg, storage, cal, now_utc, run_id, failed_sources)
+    closes = {r.symbol: r.metrics.last_close for r in ev.rows}
+    off = build_official(cfg, storage, now_utc, closes)
+    ev.fundamentals, ev.filings, ev.macro = off.fundamentals, off.filings, off.macro
+    for f in off.fundamentals:
+        ev.sources[f.source_url] = f"SEC EDGAR — {f.ticker} (CIK {f.cik})"
+    for fl in off.filings:
+        ev.sources[fl["url"]] = f"SEC 8-K — {fl['ticker']} ({fl['filed']})"
+    for m in off.macro:
+        if m.value is not None:
+            ev.sources[m.source_url] = f"FRED — {m.series_id}"
     fingerprint = ev.fingerprint()
     target = cfg.app.reports_dir / f"{ev.report_date.isoformat()}.md"
     if not force and storage.latest_fingerprint(ev.report_date) == fingerprint and target.exists():
@@ -266,3 +286,131 @@ def scheduled_moment(now_utc: datetime, cfg: Config, grace_hours: int = 12) -> d
     if local - slot_yesterday <= timedelta(hours=grace_hours):
         return slot_yesterday.astimezone(UTC)
     return now_utc
+
+
+# --- Etap 3: SEC EDGAR + FRED -------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class OfficialData:
+    fundamentals: list[Fundamentals]
+    filings: list[dict[str, str]]  # recent 8-K: ticker, filed, items, url
+    macro: list[MacroRow]
+    failed: dict[str, str]
+
+
+def _fresh(storage: Storage, key: str, now_utc: datetime, hours: float) -> str | None:
+    hit = storage.get_cache(key)
+    if hit and now_utc - hit[1] < timedelta(hours=hours):
+        return hit[0]
+    return None
+
+
+def fetch_official(cfg: Config, storage: Storage, sec: SecProvider | None,
+                   fred: FredProvider | None, now_utc: datetime) -> dict[str, str]:
+    """Refresh cached SEC/FRED payloads. Stale cache is kept on failure (with its date)."""
+    failed: dict[str, str] = {}
+    if sec is not None and cfg.fundamentals.enabled:
+        try:
+            tmap_raw = _fresh(storage, "sec:tickers", now_utc, 24 * 7)
+            if tmap_raw is None:
+                tmap = sec.ticker_map()
+                storage.put_cache("sec:tickers", json.dumps(tmap), SEC_TICKERS_URL, now_utc)
+            else:
+                tmap = json.loads(tmap_raw)
+            for inst in sec_eligible(cfg):
+                cik = tmap.get(inst.symbol.upper())
+                if cik is None:
+                    failed[f"sec:{inst.symbol}"] = "brak CIK"
+                    continue
+                for kind, getter in (("facts", sec.company_facts), ("subs", sec.submissions)):
+                    key = f"sec:{kind}:{cik}"
+                    if _fresh(storage, key, now_utc, cfg.fundamentals.refresh_hours):
+                        continue
+                    try:
+                        data = getter(cik)
+                        if kind == "facts":
+                            slim = [asdict(f) for f in parse_company_facts(data)]
+                            payload = json.dumps(slim, default=str)
+                        else:
+                            payload = json.dumps(data.get("filings", {}).get("recent", {}))
+                        storage.put_cache(key, payload, f"https://data.sec.gov/ CIK {cik}",
+                                          now_utc)
+                    except Exception as exc:
+                        log.warning("SEC %s %s: %s", inst.symbol, kind, type(exc).__name__)
+                        failed[f"sec:{inst.symbol}:{kind}"] = type(exc).__name__
+        except Exception as exc:
+            failed["sec"] = type(exc).__name__
+    if fred is not None and cfg.macro.enabled:
+        start = now_utc.date() - timedelta(days=cfg.macro.lookback_days)
+        for s in cfg.macro.series:
+            key = f"fred:{s.id}"
+            if _fresh(storage, key, now_utc, cfg.macro.refresh_hours):
+                continue
+            try:
+                obs = fred.series(s.id, start)
+                if not obs:
+                    raise ValueError("pusta seria")
+                storage.upsert_macro(s.id, [(o.obs_date, o.value) for o in obs], now_utc)
+                storage.put_cache(key, "ok", f"https://fred.stlouisfed.org/series/{s.id}", now_utc)
+            except Exception as exc:
+                log.warning("FRED %s: %s", s.id, type(exc).__name__)
+                failed[f"fred:{s.id}"] = type(exc).__name__
+    return failed
+
+
+def sec_eligible(cfg: Config) -> list[InstrumentConfig]:
+    """US issuers filing 10-Q/10-K. Foreign private issuers (20-F/IFRS) are out of scope."""
+    return [i for i in cfg.instruments
+            if i.kind == "equity" and i.issuer_country == "US" and i.verified]
+
+
+def _facts_from_cache(payload: str) -> list[Fact]:
+    out: list[Fact] = []
+    for d in json.loads(payload):
+        out.append(Fact(
+            concept=d["concept"], unit=d["unit"],
+            start=date_t.fromisoformat(d["start"]) if d["start"] else None,
+            end=date_t.fromisoformat(d["end"]), val=float(d["val"]), fy=d.get("fy"),
+            fp=d.get("fp"), form=d["form"], filed=date_t.fromisoformat(d["filed"]), accn=d["accn"],
+        ))
+    return out
+
+
+ITEM_LABELS = {"2.02": "wyniki finansowe", "5.02": "zmiany w zarządzie/radzie",
+               "1.01": "istotna umowa", "8.01": "inne zdarzenia", "7.01": "Reg FD",
+               "2.01": "przejęcie/zbycie aktywów", "1.05": "incydent cyberbezpieczeństwa"}
+
+
+def build_official(cfg: Config, storage: Storage, now_utc: datetime,
+                   last_close: dict[str, float | None]) -> OfficialData:
+    fundamentals: list[Fundamentals] = []
+    filings: list[dict[str, str]] = []
+    macro_rows: list[MacroRow] = []
+    tmap_raw = storage.get_cache("sec:tickers")
+    tmap: dict[str, int] = json.loads(tmap_raw[0]) if tmap_raw else {}
+    since = now_utc.date() - timedelta(days=cfg.fundamentals.filings_lookback_days)
+    if cfg.fundamentals.enabled:
+        for inst in sec_eligible(cfg):
+            cik = tmap.get(inst.symbol.upper())
+            if cik is None:
+                continue
+            facts = storage.get_cache(f"sec:facts:{cik}")
+            if facts:
+                fundamentals.append(extract(inst.symbol, inst.name, cik,
+                                            _facts_from_cache(facts[0]),
+                                            last_close.get(inst.symbol)))
+            subs = storage.get_cache(f"sec:subs:{cik}")
+            if subs:
+                for f in parse_recent_8k({"filings": {"recent": json.loads(subs[0])}}, cik, since):
+                    items = [ITEM_LABELS.get(x.strip(), x.strip())
+                             for x in f["items"].split(",") if x.strip() and x.strip() != "9.01"]
+                    filings.append({**f, "ticker": inst.symbol,
+                                    "items": ", ".join(items) or "bez opisu pozycji"})
+    if cfg.macro.enabled:
+        for s in cfg.macro.series:
+            obs = [MacroObs(d, v) for d, v in storage.load_macro(s.id)]
+            macro_rows.append(summarize(s.id, s.name, s.region, s.unit, s.transform, obs,
+                                        now_utc.date()))
+    filings.sort(key=lambda f: (f["filed"], f["ticker"]), reverse=True)
+    return OfficialData(fundamentals, filings, macro_rows, {})
