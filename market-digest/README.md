@@ -61,6 +61,22 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 8: scenariusze
+
+Każdy scenariusz (wzrostowy, neutralny, spadkowy) to zestaw obserwowalnych warunków liczonych
+z danych, które już są w raporcie:
+- S&P 500 względem średniej 50 sesji;
+- spadek od szczytu 52 tygodni;
+- zmiana z 21 sesji;
+- VIX;
+- spread rentowności 10Y − 2Y;
+- szerokość rynku, czyli ile regionów ma dodatni wynik z 5 sesji.
+
+Raport pokazuje, które warunki są dziś spełnione, a które nie. Brak danych nie liczy się ani
+jako spełnienie, ani jako niespełnienie. Progi są umowne (VIX 20/25, korekta −10%, ±3%) i
+opisane w stopce. Raport nie podaje **żadnych prawdopodobieństw** ani rekomendacji. Logika jest
+w `scenarios.py`.
+
 ## Sekcja 7: sektory (surowce, energia, banki, uran)
 
 Instrumenty z polem `sector` w `config.yaml` (symbole sprawdzone w Yahoo 2026-11-23):

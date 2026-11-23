@@ -22,6 +22,14 @@ class Metrics:
     drawdown_52w: float | None
     ret_21d_pln: float | None = None
     flags: tuple[str, ...] = field(default_factory=tuple)
+    vs_sma50: float | None = None  # % distance of last close from 50-session SMA
+
+
+def sma_distance(bars: Sequence[PriceBar], window: int = 50) -> float | None:
+    closes = [b.close for b in bars[-window:] if b.close is not None]
+    if len(bars) < window or len(closes) < window:
+        return None
+    return pct(closes[-1], sum(closes) / window)
 
 
 def pct(new: float | None, old: float | None) -> float | None:
@@ -113,6 +121,7 @@ def compute(
         drawdown_52w=drawdown_from_high(clean),
         ret_21d_pln=converted_return(clean, fx, 21),
         flags=tuple(flags),
+        vs_sma50=sma_distance(clean),
     )
 
 

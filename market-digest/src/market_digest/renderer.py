@@ -153,8 +153,8 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         w(UNAVAILABLE)
         w("")
     _render_sectors(ev, w)
-    for title in ("8. Główne scenariusze: wzrostowy, neutralny, spadkowy",
-                  "9. Opinie z internetu — fact-check"):
+    _render_scenarios(ev, w)
+    for title in ("9. Opinie z internetu — fact-check",):
         w(f"## {title}")
         w("")
         w(UNAVAILABLE)
@@ -400,4 +400,43 @@ def _render_sectors(ev: EvidencePackage, w: Callable[[str], None]) -> None:
       "spółek uranowych to nie cena uranu — notowania U3O8 nie są dostępne w darmowych źródłach. "
       "XLF to cały sektor finansowy USA, nie tylko banki. ETF-y z istotnym udziałem emitentów EM "
       "(np. URA) są wyłączone z zakresu.*")
+    w("")
+
+
+def _render_scenarios(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    from market_digest import scenarios as sc
+
+    w("## 8. Główne scenariusze: wzrostowy, neutralny, spadkowy")
+    w("")
+    ind = sc.indicators_from(ev)
+    scen = sc.evaluate(ind)
+    if all(s.known == 0 for s in scen):
+        w("Brak danych do oceny warunków scenariuszy.")
+        w("")
+        return
+    w("| Scenariusz | Spełnione warunki | Co by go wspierało (spełnione) | Co go podważa (niespełnione) |")
+    w("|---|---:|---|---|")
+    for s in scen:
+        sup = "; ".join(c.label for c in s.met) or "—"
+        con = "; ".join(c.label for c in s.unmet) or "—"
+        missing = len(s.conditions) - s.known
+        cnt = f"{len(s.met)}/{s.known}" + (f" (+{missing} bez danych)" if missing else "")
+        w(f"| {s.name} | {cnt} | {sup} | {con} |")
+    w("")
+    w("**Wskaźniki użyte do oceny:**")
+    w("")
+    w(f"- {ind.index_label} (sesja {_d(ind.index_date)}): od średniej 50 sesji "
+      f"{pct(ind.vs_sma50)}, od szczytu 52 tyg. {pct(ind.drawdown)}, 21 sesji {pct(ind.ret_21d)}.")
+    w(f"- VIX: {plain(ind.vix)} ({_d(ind.vix_date)}); 10Y − 2Y: "
+      f"{pp(ind.spread_10y2y)} ({_d(ind.spread_date)}).")
+    br = (NA if ind.breadth_up is None
+          else f"{round(ind.breadth_up * ind.breadth_n)}/{ind.breadth_n} regionów z dodatnim wynikiem")
+    w(f"- Szerokość rynku (5 sesji, po 1 benchmarku na region): {br}.")
+    w("")
+    w(f"*To warunki do monitorowania, nie wyliczone prawdopodobieństwa ani polecenia inwestycyjne. "
+      f"Progi są umowne (VIX {sc.VIX_CALM:.0f}/{sc.VIX_STRESS:.0f}, korekta "
+      f"{sc.CORRECTION_DD:.0f}% od szczytu, ±{sc.FLAT_21D:.0f}% dla rynku bocznego, "
+      f"{sc.BREADTH_SHARE:.0%} regionów). Odwrócona krzywa rentowności bywała sygnałem "
+      "wyprzedzającym, ale z nieregularnym opóźnieniem i fałszywymi sygnałami. Spełnienie "
+      "warunków kilku scenariuszy naraz jest możliwe.*")
     w("")
