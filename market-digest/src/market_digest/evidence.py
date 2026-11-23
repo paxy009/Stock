@@ -76,6 +76,7 @@ class EvidencePackage:
     macro: list[Any] = field(default_factory=list)  # macro.MacroRow
     changes: Any = None  # changes.ChangeSet; derived from the previous report, not fingerprinted
     upcoming: list[Any] = field(default_factory=list)  # upcoming.UpcomingEvent
+    ai: Any = None  # fundamentals.AiData
 
     def allowed_urls(self) -> set[str]:
         return set(self.sources)
@@ -97,6 +98,7 @@ class EvidencePackage:
             "filings": _plain(self.filings),
             "macro": _plain([asdict(m) for m in self.macro]),
             "upcoming": _plain([asdict(u) for u in self.upcoming]),
+            "ai": _plain(asdict(self.ai)) if self.ai is not None else None,
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
 

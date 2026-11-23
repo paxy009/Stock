@@ -61,6 +61,19 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 6: AI i infrastruktura
+
+Dane z faktów XBRL w SEC, które są już w cache:
+- **CapEx hyperscalerów** (MSFT, GOOGL, AMZN, META): kwartał i jego zmiana r/r, suma 4 kwartałów
+  i jej zmiana r/r, CapEx jako % przychodów oraz łączna suma.
+- **Przychody dostawców** (NVDA, AVGO, AMD): kwartał i 4 kwartały, każde ze zmianą r/r.
+- **Wyliczanie kwartałów:** w 10-Q przepływy pieniężne są narastające od początku roku (YTD),
+  więc kwartał to różnica YTD; Q4 = rok − 9 miesięcy. Suma 4 kwartałów (TTM) powstaje tylko
+  wtedy, gdy są wszystkie 4 kwartały.
+- **Zastrzeżenia w stopce:** CapEx to wszystkie nakłady, nie tylko AI; przychody to całe
+  przychody spółki, nie segment; zbieżność w czasie nie dowodzi rentowności AI.
+- **Konfiguracja:** listy spółek w `ai.hyperscalers` i `ai.suppliers`.
+
 ## Sekcja 8: scenariusze
 
 Każdy scenariusz (wzrostowy, neutralny, spadkowy) to zestaw obserwowalnych warunków liczonych

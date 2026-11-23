@@ -22,7 +22,16 @@ from market_digest.delivery import Mailer, build_message, send_with_retry
 from market_digest.eligibility import classify
 from market_digest.events import group_events, rank_events
 from market_digest.evidence import EvidencePackage, InstrumentRow, RegionStatus, decide_status
-from market_digest.fundamentals import Fact, Fundamentals, extract
+from market_digest.fundamentals import (
+    CAPEX,
+    REVENUE,
+    AiData,
+    Fact,
+    FlowStats,
+    Fundamentals,
+    extract,
+    flow_stats,
+)
 from market_digest.macro import MacroObs, MacroRow, summarize
 from market_digest.models import Eligibility
 from market_digest.narrative import LLMProvider, TemplateProvider, compose_with_fallback
@@ -198,6 +207,7 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
     closes = {r.symbol: r.metrics.last_close for r in ev.rows}
     off = build_official(cfg, storage, now_utc, closes)
     ev.fundamentals, ev.filings, ev.macro = off.fundamentals, off.filings, off.macro
+    ev.ai = off.ai
     for f in off.fundamentals:
         ev.sources[f.source_url] = f"SEC EDGAR — {f.ticker} (CIK {f.cik})"
     for fl in off.filings:
@@ -315,6 +325,7 @@ class OfficialData:
     filings: list[dict[str, str]]  # recent 8-K: ticker, filed, items, url
     macro: list[MacroRow]
     failed: dict[str, str]
+    ai: AiData | None = None
 
 
 def _fresh(storage: Storage, key: str, now_utc: datetime, hours: float) -> str | None:
@@ -435,7 +446,26 @@ def build_official(cfg: Config, storage: Storage, now_utc: datetime,
             macro_rows.append(summarize(s.id, s.name, s.region, s.unit, s.transform, obs,
                                         now_utc.date()))
     filings.sort(key=lambda f: (f["filed"], f["ticker"]), reverse=True)
-    return OfficialData(fundamentals, filings, macro_rows, {})
+    ai = build_ai(cfg, storage, tmap)
+    return OfficialData(fundamentals, filings, macro_rows, {}, ai)
+
+
+def build_ai(cfg: Config, storage: Storage, tmap: dict[str, int]) -> AiData | None:
+    if not (cfg.ai.enabled and cfg.fundamentals.enabled):
+        return None
+
+    def facts_for(t: str) -> list[Fact] | None:
+        cik = tmap.get(t.upper())
+        hit = storage.get_cache(f"sec:facts:{cik}") if cik else None
+        return _facts_from_cache(hit[0]) if hit else None
+
+    hyp: list[tuple[FlowStats, FlowStats]] = []
+    for t in cfg.ai.hyperscalers:
+        fs = facts_for(t)
+        if fs:
+            hyp.append((flow_stats(t, fs, CAPEX), flow_stats(t, fs, REVENUE)))
+    sup = [flow_stats(t, fs, REVENUE) for t in cfg.ai.suppliers if (fs := facts_for(t))]
+    return AiData(hyp, sup) if hyp or sup else None
 
 
 # --- Sekcja 10: kalendarz wydarzeń ---------------------------------------------------------

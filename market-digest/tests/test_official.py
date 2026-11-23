@@ -243,3 +243,57 @@ def test_stale_fcf_period_is_flagged() -> None:
     f = extract("UUUU", "Energy Fuels", 1, facts, None)
     assert f.fcf == 5.0 and f.fcf_end == date(2025, 12, 31)
     assert any("wcześniejszego okresu" in fl for fl in f.flags)
+
+
+def _capex_ytd(year: int, vals: tuple[float, float, float, float]) -> list[Fact]:
+    """Calendar-year issuer: 10-Q YTD for Q1..Q3 and 10-K full year."""
+    c = "PaymentsToAcquirePropertyPlantAndEquipment"
+    q1, h1, m9, fy = vals
+    return [F(c, f"{year}-01-01", f"{year}-03-31", q1, filed=f"{year}-05-01", accn=f"{year}a"),
+            F(c, f"{year}-01-01", f"{year}-06-30", h1, filed=f"{year}-08-01", accn=f"{year}b"),
+            F(c, f"{year}-01-01", f"{year}-09-30", m9, filed=f"{year}-11-01", accn=f"{year}c"),
+            F(c, f"{year}-01-01", f"{year}-12-31", fy, filed=f"{year + 1}-02-01", form="10-K",
+              accn=f"{year}d")]
+
+
+def test_quarterly_from_ytd_and_ttm() -> None:
+    from market_digest.fundamentals import CAPEX, flow_stats, quarterly
+
+    facts = _capex_ytd(2025, (10, 22, 36, 52)) + _capex_ytd(2026, (15, 32, 51, 0))[:3]
+    q = quarterly(facts, CAPEX)
+    assert q[date(2025, 6, 30)] == 12 and q[date(2025, 12, 31)] == 16  # Q4 = FY - 9M
+    assert q[date(2026, 9, 30)] == 19
+    st = flow_stats("MSFT", facts, CAPEX)
+    assert st.q_end == date(2026, 9, 30) and st.q_value == 19
+    assert st.q_yoy == pytest.approx((19 / 14 - 1) * 100)
+    assert st.ttm == 16 + 15 + 17 + 19  # Q4'25 + Q1..Q3'26
+    assert st.ttm_yoy is None  # no full year before 2025 in the fixture
+
+
+def test_ttm_requires_four_quarters() -> None:
+    from market_digest.fundamentals import CAPEX, flow_stats
+
+    st = flow_stats("X", _capex_ytd(2026, (15, 32, 51, 0))[:3], CAPEX)
+    assert st.q_value == 19 and st.ttm is None
+
+
+def test_section_6_rendered(tmp_path: Any) -> None:
+    from market_digest import pipeline
+    from market_digest.config import AiConfig, FundamentalsConfig
+    from market_digest.storage import Storage
+    from tests.conftest import FakeCalendar, make_config
+    from tests.test_pipeline import NOW, _news, _prices
+
+    cfg = make_config(tmp_path).model_copy(update={
+        "fundamentals": FundamentalsConfig(enabled=True),
+        "ai": AiConfig(hyperscalers=("NVDA",), suppliers=("NVDA",)),
+    })
+    st = Storage(cfg.app.db_path)
+    pipeline.fetch(cfg, st, _prices(), _news(), NOW)
+    pipeline.fetch_official(cfg, st, FakeSec(), None, NOW)
+    md = pipeline.generate(cfg, st, FakeCalendar(), NOW).report_path.read_text(  # type: ignore[union-attr]
+        encoding="utf-8")
+    s6 = md.split("## 6.")[1].split("## 7.")[0]
+    assert "| NVDA | 2026-07-26 | 96,0 mld USD |" in s6  # revenue quarter from fixture
+    assert "nie dowodzi rentowności" in s6
+    assert "Moduł niedostępny" not in s6

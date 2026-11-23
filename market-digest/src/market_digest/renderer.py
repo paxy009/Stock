@@ -148,11 +148,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         w("")
     _render_fundamentals(ev, w)
     _render_macro(ev, w)
-    for title in ("6. AI, infrastruktura i przewaga konkurencyjna",):
-        w(f"## {title}")
-        w("")
-        w(UNAVAILABLE)
-        w("")
+    _render_ai(ev, w)
     _render_sectors(ev, w)
     _render_scenarios(ev, w)
     for title in ("9. Opinie z internetu — fact-check",):
@@ -440,4 +436,51 @@ def _render_scenarios(ev: EvidencePackage, w: Callable[[str], None]) -> None:
       f"{sc.BREADTH_SHARE:.0%} regionów). Odwrócona krzywa rentowności bywała sygnałem "
       "wyprzedzającym, ale z nieregularnym opóźnieniem i fałszywymi sygnałami. Spełnienie "
       "warunków kilku scenariuszy naraz jest możliwe.*")
+    w("")
+
+
+def _render_ai(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 6. AI, infrastruktura i przewaga konkurencyjna")
+    w("")
+    ai = ev.ai
+    if ai is None:
+        w("Brak danych SEC do analizy nakładów na infrastrukturę w tym przebiegu.")
+        w("")
+        return
+    if ai.hyperscalers:
+        w("**Nakłady inwestycyjne (CapEx) hyperscalerów** — wydatki na centra danych, serwery i sieć:")
+        w("")
+        w("| Spółka | Kwartał (koniec) | CapEx kw. | r/r | CapEx 4 kw. | r/r | CapEx / przychody 4 kw. |")
+        w("|---|---|---:|---:|---:|---:|---:|")
+        tot = tot_prev = 0.0
+        complete = True
+        for capex, rev in ai.hyperscalers:
+            ratio = (capex.ttm / rev.ttm * 100) if capex.ttm and rev.ttm else None
+            w(f"| {capex.ticker} | {_d(capex.q_end)} | {money(capex.q_value)} | {pct(capex.q_yoy)} | "
+              f"{money(capex.ttm)} | {pct(capex.ttm_yoy)} | {margin_txt(ratio)} |")
+            if capex.ttm is None or capex.ttm_yoy is None:
+                complete = False
+            else:
+                tot += capex.ttm
+                tot_prev += capex.ttm / (1 + capex.ttm_yoy / 100)
+        w("")
+        if complete and tot_prev:
+            w(f"**Łącznie (4 kw.):** {money(tot)}, r/r {pct((tot / tot_prev - 1) * 100)}. "
+              "Kwartały fiskalne spółek mogą się nie pokrywać.")
+            w("")
+    if ai.suppliers:
+        w("**Przychody dostawców infrastruktury:**")
+        w("")
+        w("| Spółka | Kwartał (koniec) | Przychody kw. | r/r | Przychody 4 kw. | r/r |")
+        w("|---|---|---:|---:|---:|---:|")
+        for s in ai.suppliers:
+            w(f"| {s.ticker} | {_d(s.q_end)} | {money(s.q_value)} | {pct(s.q_yoy)} | "
+              f"{money(s.ttm)} | {pct(s.ttm_yoy)} |")
+        w("")
+    w("*CapEx = PaymentsToAcquirePropertyPlantAndEquipment (US-GAAP, SEC EDGAR); obejmuje "
+      "wszystkie nakłady, nie tylko AI — spółki nie raportują osobno „CapEx na AI”. Kwartał "
+      "wyliczony z danych narastających (YTD) w 10-Q. Przychody dostawców to całe przychody "
+      "spółki, nie tylko segment data center. Wzrost nakładów u odbiorców i przychodów "
+      "u dostawców jest zgodny w czasie, ale nie dowodzi rentowności inwestycji w AI ani "
+      "trwałości popytu. Leasing (np. finance leases) nie jest uwzględniony.*")
     w("")
