@@ -137,3 +137,33 @@ class HttpFred:
                          headers={"User-Agent": "market-digest/0.1"})
         resp.raise_for_status()
         return parse_fred_csv(resp.text)
+
+
+class HttpUpcoming:
+    def __init__(self, timeout: float = 30.0) -> None:
+        self.timeout = timeout
+        self.headers = {"User-Agent": "market-digest/0.1 (private research digest)"}
+
+    def _text(self, url: str) -> str:
+        import httpx
+
+        resp = httpx.get(url, timeout=self.timeout, headers=self.headers, follow_redirects=True)
+        resp.raise_for_status()
+        return resp.text
+
+    def fomc_page(self) -> str:
+        from market_digest.upcoming import FOMC_URL
+
+        return self._text(FOMC_URL)
+
+    def ecb_page(self) -> str:
+        from market_digest.upcoming import ECB_URL
+
+        return self._text(ECB_URL)
+
+    def earnings_dates(self, symbol: str) -> list[date]:
+        import yfinance as yf
+
+        from market_digest.upcoming import parse_earnings_calendar
+
+        return parse_earnings_calendar(yf.Ticker(symbol).calendar)

@@ -1,4 +1,4 @@
-"""Orchestrates fetch -> store -> analyze -> evidence -> narrative -> render -> QA -> atomic write."""
+﻿"""Orchestrates fetch -> store -> analyze -> evidence -> narrative -> render -> QA -> atomic write."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_t
 from pathlib import Path
+from typing import Protocol
 
 from market_digest import analytics
 from market_digest.calendar import SessionCalendar, local_date
@@ -37,6 +38,14 @@ from market_digest.providers.prices import PriceProvider
 from market_digest.qa import validate_markdown
 from market_digest.renderer import render
 from market_digest.storage import Storage
+from market_digest.upcoming import (
+    UpcomingEvent,
+    closures,
+    earnings_events,
+    parse_ecb,
+    parse_fomc,
+    within,
+)
 
 log = logging.getLogger(__name__)
 
@@ -198,6 +207,10 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
     ev.changes = compute_changes(
         storage.previous_snapshot(ev.report_date), ev,
         lambda sym, d: storage.close_on(sym, "yfinance", d))
+    ev.upcoming = build_upcoming(cfg, storage, cal, ev.report_date)
+    for u in ev.upcoming:
+        ev.sources[u.source_url] = u.source_name + (
+            " — kalendarz" if u.kind != "earnings" else " — daty wyników (szacunek)")
     fingerprint = ev.fingerprint()
     target = cfg.app.reports_dir / f"{ev.report_date.isoformat()}.md"
     if not force and storage.latest_fingerprint(ev.report_date) == fingerprint and target.exists():
@@ -422,3 +435,82 @@ def build_official(cfg: Config, storage: Storage, now_utc: datetime,
                                         now_utc.date()))
     filings.sort(key=lambda f: (f["filed"], f["ticker"]), reverse=True)
     return OfficialData(fundamentals, filings, macro_rows, {})
+
+
+# --- Sekcja 10: kalendarz wydarzeń ---------------------------------------------------------
+
+
+class UpcomingProvider(Protocol):
+    def fomc_page(self) -> str: ...
+
+    def ecb_page(self) -> str: ...
+
+    def earnings_dates(self, symbol: str) -> list[date_t]: ...
+
+
+def fetch_upcoming(cfg: Config, storage: Storage, prov: UpcomingProvider | None,
+                   now_utc: datetime) -> dict[str, str]:
+    failed: dict[str, str] = {}
+    if prov is None or not cfg.upcoming.enabled:
+        return failed
+    hours = cfg.upcoming.refresh_hours
+    if cfg.upcoming.central_banks:
+        for key, getter, parser in (("cal:fomc", prov.fomc_page, parse_fomc),
+                                    ("cal:ecb", prov.ecb_page, parse_ecb)):
+            if _fresh(storage, key, now_utc, hours):
+                continue
+            try:
+                evs = parser(getter())
+                if not evs:
+                    raise ValueError("nie znaleziono dat (zmiana struktury strony?)")
+                storage.put_cache(key, json.dumps([asdict(e) for e in evs], default=str),
+                                  evs[0].source_url, now_utc)
+            except Exception as exc:
+                log.warning("Kalendarz %s: %s", key, type(exc).__name__)
+                failed[key.replace("cal:", "kalendarz:")] = type(exc).__name__
+    if cfg.upcoming.earnings:
+        for inst in cfg.instruments:
+            if inst.kind != "equity" or not inst.verified:
+                continue
+            key = f"cal:earn:{inst.symbol}"
+            if _fresh(storage, key, now_utc, hours):
+                continue
+            try:
+                days = prov.earnings_dates(inst.symbol)
+                evs = earnings_events(inst.symbol, inst.name, inst.region, days)
+                storage.put_cache(key, json.dumps([asdict(e) for e in evs], default=str),
+                                  f"https://finance.yahoo.com/quote/{inst.symbol}", now_utc)
+            except Exception as exc:
+                log.warning("Wyniki %s: %s", inst.symbol, type(exc).__name__)
+                failed[f"kalendarz:wyniki:{inst.symbol}"] = type(exc).__name__
+    return failed
+
+
+def _events_from_cache(payload: str) -> list[UpcomingEvent]:
+    return [UpcomingEvent(date_t.fromisoformat(d["day"]), d["title"], d["kind"], d["region"],
+                          d["source_name"], d["source_url"], d["certainty"])
+            for d in json.loads(payload)]
+
+
+def build_upcoming(cfg: Config, storage: Storage, cal: SessionCalendar, report_day: date_t
+                   ) -> list[UpcomingEvent]:
+    if not cfg.upcoming.enabled:
+        return []
+    horizon = cfg.upcoming.horizon_days
+    if report_day.weekday() == 6:
+        horizon = max(horizon, cfg.upcoming.weekly_horizon_days)
+    end = report_day + timedelta(days=horizon)
+    evs: list[UpcomingEvent] = []
+    keys = []
+    if cfg.upcoming.central_banks:
+        keys += ["cal:fomc", "cal:ecb"]
+    if cfg.upcoming.earnings:
+        keys += [f"cal:earn:{i.symbol}" for i in cfg.instruments
+                 if i.kind == "equity" and i.verified]
+    for key in keys:
+        hit = storage.get_cache(key)
+        if hit:
+            evs.extend(_events_from_cache(hit[0]))
+    if cfg.upcoming.market_closures:
+        evs.extend(closures(cal.is_session, report_day, end))
+    return within(evs, report_day, end)

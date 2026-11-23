@@ -61,6 +61,18 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 10: kalendarz wydarzeń
+
+- **Posiedzenia Fed (FOMC) i EBC:** daty z oficjalnych stron. Raport podaje dzień decyzji, czyli
+  ostatni dzień posiedzenia. Jeśli strona zmieni układ i parser nie znajdzie dat, źródło trafia
+  do sekcji 11; błąd nie przechodzi po cichu.
+- **Daty wyników spółek:** z Yahoo Finance (`Ticker.calendar`), zawsze oznaczone jako
+  **szacunkowe**.
+- **Dni bez sesji** (święta) na NYSE, Xetra, LSE, Tokio, Toronto i ASX: z `exchange_calendars`.
+- **Horyzont:** 7 dni (`upcoming.horizon_days`). Najbliższe wydarzenie trafia też do linii „Na co
+  zwrócić uwagę” pod TL;DR. Dane są w cache przez 20 h; przy awarii źródła raport używa
+  ostatnich zapisanych danych.
+
 ## Sekcja 2: zmiany od poprzedniego raportu
 
 Raport porównuje swój pakiet dowodów z najnowszą wersją raportu z wcześniejszej daty (archiwum w

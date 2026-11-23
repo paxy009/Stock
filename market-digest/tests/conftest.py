@@ -83,6 +83,9 @@ class FakeCalendar:
             return DayStatus.TRADING
         return DayStatus.WEEKEND if local_day.weekday() >= 5 else DayStatus.HOLIDAY
 
+    def is_session(self, exchange: str, day: date) -> bool:
+        return self._is_session(exchange, day)
+
 
 def news(title: str, url: str, published: datetime, feed: str = "fed",
          tier: str = "official", summary: str = "") -> NewsItem:

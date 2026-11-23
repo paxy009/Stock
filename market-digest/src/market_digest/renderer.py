@@ -1,9 +1,10 @@
-"""Markdown renderer following 02_REPORT_TEMPLATE. No network access, deterministic output."""
+﻿"""Markdown renderer following 02_REPORT_TEMPLATE. No network access, deterministic output."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from market_digest.evidence import REGION_LABELS, EvidencePackage, InstrumentRow
@@ -81,8 +82,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     w("")
     w(f"**Obraz rynku:** {content.overview}")
     w("")
-    w("**Na co zwrócić uwagę w kolejnym dniu sesyjnym:** kalendarz wydarzeń nie jest jeszcze "
-      "dostępny w tej wersji.")
+    w("**Na co zwrócić uwagę w kolejnym dniu sesyjnym:** " + _next_up(ev))
     w("")
     w("## 1. Rynek w liczbach — globalne rynki rozwinięte")
     w("")
@@ -137,12 +137,12 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     for title in ("6. AI, infrastruktura i przewaga konkurencyjna",
                   "7. Sektory dodatkowe: uran, energia, banki, surowce",
                   "8. Główne scenariusze: wzrostowy, neutralny, spadkowy",
-                  "9. Opinie z internetu — fact-check",
-                  "10. Co warto obserwować dalej?"):
+                  "9. Opinie z internetu — fact-check"):
         w(f"## {title}")
         w("")
         w(UNAVAILABLE)
         w("")
+    _render_upcoming(ev, w)
     w("## 11. Jakość danych i ograniczenia")
     w("")
     cov = "; ".join(f"{REGION_LABELS.get(r.region, r.region)} {r.received}/{r.requested}"
@@ -290,4 +290,41 @@ def _render_changes(ev: EvidencePackage, w: Callable[[str], None]) -> None:
     w("")
     w("*Ruch „między raportami” liczony od ceny z dnia sesji poprzedniego raportu, według "
       "aktualnych danych dostawcy (uwzględnia splity i korekty).*")
+    w("")
+
+
+KIND_LABEL = {"central_bank": "bank centralny", "earnings": "wyniki spółki",
+              "market_closure": "kalendarz giełdy"}
+
+
+def _event_line(u: Any) -> str:
+    est = " *(data szacunkowa — do potwierdzenia przez spółkę)*" if u.certainty == "estimated" else ""
+    return (f"**{u.day.isoformat()} ({DAYS_PL[u.day.weekday()]})** — {u.title}{est} "
+            f"[{u.source_name}]({u.source_url})")
+
+
+def _next_up(ev: EvidencePackage) -> str:
+    if not ev.upcoming:
+        return "brak zaplanowanych wydarzeń w skonfigurowanych źródłach na najbliższe dni."
+    first_day = ev.upcoming[0].day
+    same = [u for u in ev.upcoming if u.day == first_day][:3]
+    return "; ".join(f"{u.day.isoformat()}: {u.title}" for u in same) + " (szczegóły w sekcji 10)."
+
+
+def _render_upcoming(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 10. Co warto obserwować dalej?")
+    w("")
+    if not ev.upcoming:
+        w("Brak zaplanowanych wydarzeń w skonfigurowanych źródłach w najbliższym tygodniu.")
+        w("")
+        return
+    horizon = (ev.upcoming[-1].day - ev.report_date).days
+    w(f"Najbliższe wydarzenia (do {horizon} dni):")
+    w("")
+    for i, u in enumerate(ev.upcoming, 1):
+        w(f"{i}. {_event_line(u)} — *{KIND_LABEL.get(u.kind, u.kind)}, "
+          f"{REGION_LABELS.get(u.region, u.region)}*")
+    w("")
+    w("*Daty posiedzeń Fed/EBC z oficjalnych kalendarzy; daty wyników spółek z Yahoo Finance są "
+      "szacunkowe, dopóki spółka ich nie potwierdzi. Dni bez sesji wg exchange_calendars.*")
     w("")

@@ -135,6 +135,16 @@ class MacroConfig(_Strict):
     series: tuple[MacroSeriesConfig, ...] = ()
 
 
+class UpcomingConfig(_Strict):
+    enabled: bool = False
+    horizon_days: int = Field(default=7, ge=1, le=31)
+    weekly_horizon_days: int = Field(default=7, ge=1, le=31)  # Sunday "next week" calendar
+    refresh_hours: float = 20.0
+    central_banks: bool = True
+    earnings: bool = True
+    market_closures: bool = True
+
+
 class Config(_Strict):
     app: AppConfig = AppConfig()
     coverage: CoverageConfig
@@ -145,6 +155,7 @@ class Config(_Strict):
     delivery: DeliveryConfig = Field(default_factory=DeliveryConfig)
     fundamentals: FundamentalsConfig = Field(default_factory=FundamentalsConfig)
     macro: MacroConfig = Field(default_factory=MacroConfig)
+    upcoming: UpcomingConfig = Field(default_factory=UpcomingConfig)
     price_history_days: int = 400
     instruments: tuple[InstrumentConfig, ...]
     fx_pairs: dict[str, str] = Field(default_factory=dict)  # "USD" -> "USDPLN=X"

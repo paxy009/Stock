@@ -62,6 +62,13 @@ macro:
     - {id: VIXCLS, name: 'VIX', region: us, unit: 'pkt'}
     - {id: ECBDFR, name: 'ECB — stopa depozytowa', region: developed_europe, unit: '%'}
 
+# Sekcja 10 — kalendarz: posiedzenia Fed/EBC (oficjalne strony), wyniki spółek (Yahoo — szacunek),
+# dni bez sesji na monitorowanych giełdach (exchange_calendars).
+upcoming:
+  enabled: true
+  horizon_days: 7
+  refresh_hours: 20
+
 price_history_days: 400
 
 instruments:

@@ -14,7 +14,7 @@ from market_digest.config import Config, load_config
 from market_digest.delivery import DeliveryConfigError, SmtpMailer, SmtpSettings
 from market_digest.eligibility import classify
 from market_digest.providers.news import RssProvider
-from market_digest.providers.official import HttpFred, HttpSec
+from market_digest.providers.official import HttpFred, HttpSec, HttpUpcoming
 from market_digest.providers.prices import YFinanceProvider
 from market_digest.storage import Storage
 
@@ -51,6 +51,7 @@ def _official_fetch(cfg: Config, st: Storage, now: datetime) -> dict[str, str]:
                        "(np. 'market-digest twoj@email')", err=True)
     fred = HttpFred() if cfg.macro.enabled else None
     failed = pipeline.fetch_official(cfg, st, sec, fred, now)
+    failed.update(pipeline.fetch_upcoming(cfg, st, HttpUpcoming(), now))
     if sec is None and cfg.fundamentals.enabled:
         failed["sec"] = "brak SEC_USER_AGENT"
     return failed

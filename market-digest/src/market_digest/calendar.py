@@ -22,6 +22,8 @@ class SessionCalendar(Protocol):
 
     def day_status(self, exchange: str, local_day: date) -> DayStatus: ...
 
+    def is_session(self, exchange: str, day: date) -> bool: ...
+
 
 @lru_cache(maxsize=16)
 def _cal(exchange: str) -> xcals.ExchangeCalendar:
@@ -52,6 +54,9 @@ class ExchangeCalendars:
         if local_day.weekday() >= 5:
             return DayStatus.WEEKEND
         return DayStatus.HOLIDAY
+
+    def is_session(self, exchange: str, day: date) -> bool:
+        return bool(_cal(exchange).is_session(pd.Timestamp(day)))
 
 
 def local_date(at_utc: datetime, tz: str) -> date:
