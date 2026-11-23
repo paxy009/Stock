@@ -52,7 +52,7 @@ def test_em_heavy_sector_etf_excluded_and_not_in_section_1(tmp_path: Path) -> No
     md = _md(tmp_path, [70.0] * 30)
     s1 = md.split("## 1.")[1].split("## 2.")[0]
     s7 = md.split("## 7.")[1].split("## 8.")[0]
-    assert "URA" not in s7  # exposure includes KZ (EM)
+    assert "(URA)" not in s7  # exposure includes KZ (EM); "URA" alone appears in the footnote
     assert "XLE" not in s1 and "CL=F" not in s1  # sector rows live in section 7 only
     assert "Brak istotnych ruchów" in s7
 
