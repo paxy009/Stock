@@ -56,6 +56,18 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         r = by_reg.get(reg)
         return f"{_d(r.last_session)}" if r else NA
 
+    def other_sessions() -> str:
+        # Canada and Australia close ~14h apart; one shared date would mislead.
+        labels = {"XTSE": "Kanada", "XASX": "Australia"}
+        found: dict[str, date] = {}
+        for r in ev.rows:
+            ls = r.metrics.last_session
+            if r.exchange in labels and ls is not None:
+                found[r.exchange] = max(found.get(r.exchange, ls), ls)
+        if not found:
+            return sess("other_developed")
+        return " / ".join(f"{labels[x]} {found[x].isoformat()}" for x in labels if x in found)
+
     status = ev.content_status if content.generation_mode == "template" else content.generation_mode
     statuses = " · ".join(
         f"{REGION_LABELS.get(r.region, r.region)}: {r.day_status.value}" for r in ev.regions
@@ -67,7 +79,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     w(f"> **Stan na:** {gen_local:%Y-%m-%d %H:%M} {ev.timezone}  ")
     w(f"> **Ostatnie zakończone sesje (wg rynku):** USA: {sess('us')} · Europa: "
       f"{sess('developed_europe')} · Japonia: {sess('developed_asia')} · Kanada/Australia: "
-      f"{sess('other_developed')}  ")
+      f"{other_sessions()}  ")
     w(f"> **Rodzaj dnia dla regionów (wg daty raportu):** {statuses}  ")
     w(f"> **Status raportu:** {status} (treść: {ev.content_status}, tryb: {content.generation_mode})  ")
     latest = max((p for e in ev.events if (p := e.published_at_utc) is not None), default=None)
@@ -318,8 +330,7 @@ def _render_upcoming(ev: EvidencePackage, w: Callable[[str], None]) -> None:
         w("Brak zaplanowanych wydarzeń w skonfigurowanych źródłach w najbliższym tygodniu.")
         w("")
         return
-    horizon = (ev.upcoming[-1].day - ev.report_date).days
-    w(f"Najbliższe wydarzenia (do {horizon} dni):")
+    w("Najbliższe wydarzenia w kolejnych dniach:")
     w("")
     for i, u in enumerate(ev.upcoming, 1):
         w(f"{i}. {_event_line(u)} — *{KIND_LABEL.get(u.kind, u.kind)}, "
