@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from itertools import pairwise
 
 REVENUE = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
            "RevenuesNetOfInterestExpense", "SalesRevenueNet")
@@ -227,7 +228,7 @@ def quarterly(facts: Sequence[Fact], concepts: tuple[str, ...]) -> dict[date, fl
             by_start.setdefault(f.start, []).append(f)
     for group in by_start.values():
         group.sort(key=lambda f: f.end)
-        for prev, cur in zip(group, group[1:], strict=False):
+        for prev, cur in pairwise(group):
             gap = (cur.end - prev.end).days
             if QUARTER[0] <= gap <= QUARTER[1] and cur.end not in q:
                 q[cur.end] = cur.val - prev.val
