@@ -21,7 +21,7 @@ def pct(v: float | None) -> str:
 
 
 def pp(v: float | None) -> str:
-    return NA if v is None else f"{v:+.2f} p.p".replace(".", ",", 1)
+    return NA if v is None else f"{v:+.2f} p.p.".replace(".", ",", 1)
 
 
 def num(v: float | None) -> str:
@@ -124,8 +124,9 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
         w("Brak danych o ruchach spółek.")
     for r in movers[:5]:
         rel = f"; względem {r.benchmark}: {pp(r.rel_1d_vs_benchmark)}" if r.benchmark else ""
+        sep = "" if rel.endswith(".") else "."
         w(f"- **{r.symbol}** ({r.name}, sesja {_d(r.metrics.last_session)}): "
-          f"{pct(r.metrics.ret_1d)}{rel}. **Przyczyna ruchu:** niepotwierdzona.")
+          f"{pct(r.metrics.ret_1d)}{rel}{sep} **Przyczyna ruchu:** niepotwierdzona.")
     w("")
     w("## 2. Co zmieniło się od poprzedniego raportu?")
     w("")
