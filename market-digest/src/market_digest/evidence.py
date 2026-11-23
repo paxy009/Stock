@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Any
 
+from pydantic import BaseModel
+
 from market_digest.analytics import Metrics
 from market_digest.calendar import DayStatus
 from market_digest.models import NewsEvent
@@ -106,6 +108,8 @@ class EvidencePackage:
 
 
 def _plain(obj: Any) -> Any:
+    if isinstance(obj, BaseModel):
+        return obj.model_dump(mode="json")
     if isinstance(obj, dict):
         return {str(k): _plain(v) for k, v in obj.items()}
     if isinstance(obj, list | tuple):
