@@ -12,7 +12,6 @@ from market_digest.models import ReportContent
 
 DAYS_PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
 NA = "N/A"
-UNAVAILABLE = "_Moduł niedostępny w tej wersji (planowany w kolejnym etapie)._"
 REGION_ORDER = ["us", "developed_europe", "developed_asia", "other_developed", "global"]
 
 
