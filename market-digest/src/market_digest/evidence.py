@@ -77,6 +77,7 @@ class EvidencePackage:
     changes: Any = None  # changes.ChangeSet; derived from the previous report, not fingerprinted
     upcoming: list[Any] = field(default_factory=list)  # upcoming.UpcomingEvent
     ai: Any = None  # fundamentals.AiData
+    claims: list[Any] = field(default_factory=list)  # pipeline.ClaimView
 
     def allowed_urls(self) -> set[str]:
         return set(self.sources)
@@ -99,6 +100,7 @@ class EvidencePackage:
             "macro": _plain([asdict(m) for m in self.macro]),
             "upcoming": _plain([asdict(u) for u in self.upcoming]),
             "ai": _plain(asdict(self.ai)) if self.ai is not None else None,
+            "claims": sorted((c.result.claim.claim_id, c.result.status) for c in self.claims),
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
 

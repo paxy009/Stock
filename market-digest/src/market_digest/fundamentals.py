@@ -1,4 +1,4 @@
-﻿"""Deterministic extraction of reported fundamentals from SEC XBRL facts (US-GAAP)."""
+"""Deterministic extraction of reported fundamentals from SEC XBRL facts (US-GAAP)."""
 
 from __future__ import annotations
 

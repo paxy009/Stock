@@ -1,0 +1,26 @@
+# Tezy do weryfikacji (sekcja 9). Dopisuj własne; program sprawdza tylko mierzalne części.
+# kind: price (symbol + metric: ret_1d|ret_5d|ret_21d|ret_ytd|drawdown_52w|last_close|vs_sma50)
+#       fundamental (symbol + metric: revenue_yoy|net_margin|pe_ttm|eps_ttm|revenue|fcf)
+#       macro (series: id FRED, np. DGS10, VIXCLS)
+#       causal (bez op/value — oznaczane jako niesprawdzalne)
+# op: '<' | '<=' | '>' | '>=' | 'between' (wtedy value2). Wartości procentowe w %.
+# check_after: dla prognoz — przed tą datą status = prediction_pending.
+claims:
+  - text: "Nasdaq jest w korekcie, a NVDA straciła ponad 10% w tydzień przez obawy o bańkę AI"
+    source_name: "Przykład (do usunięcia)"
+    claimed_at: 2026-11-23
+    parts:
+      - {text: "QQQ ≥10% poniżej szczytu 52 tyg.", kind: price, symbol: QQQ, metric: drawdown_52w, op: '<=', value: -10}
+      - {text: "NVDA spadła >10% w 5 sesji", kind: price, symbol: NVDA, metric: ret_5d, op: '<', value: -10}
+      - {text: "przyczyną były obawy o bańkę AI", kind: causal}
+  - text: "Rentowność 10-letnich obligacji USA przekroczyła 5%"
+    source_name: "Przykład (do usunięcia)"
+    claimed_at: 2026-11-23
+    parts:
+      - {text: "US 10Y > 5%", kind: macro, series: DGS10, op: '>', value: 5}
+  - text: "S&P 500 wróci powyżej średniej 50-sesyjnej do końca roku"
+    source_name: "Przykład (do usunięcia)"
+    claimed_at: 2026-11-23
+    check_after: 2026-12-31
+    parts:
+      - {text: "S&P 500 powyżej średniej 50 sesji", kind: price, symbol: '^GSPC', metric: vs_sma50, op: '>', value: 0}

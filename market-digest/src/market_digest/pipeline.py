@@ -1,4 +1,4 @@
-﻿"""Orchestrates fetch -> store -> analyze -> evidence -> narrative -> render -> QA -> atomic write."""
+"""Orchestrates fetch -> store -> analyze -> evidence -> narrative -> render -> QA -> atomic write."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import logging
 import os
 import tempfile
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_t
@@ -17,6 +18,7 @@ from typing import Protocol
 from market_digest import analytics
 from market_digest.calendar import SessionCalendar, local_date
 from market_digest.changes import compute_changes
+from market_digest.claims import ClaimPart, ClaimResult, evaluate_claim, load_claims
 from market_digest.config import Config, InstrumentConfig
 from market_digest.delivery import Mailer, build_message, send_with_retry
 from market_digest.eligibility import classify
@@ -219,6 +221,7 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
         storage.previous_snapshot(ev.report_date), ev,
         lambda sym, d: storage.close_on(sym, "yfinance", d))
     ev.upcoming = build_upcoming(cfg, storage, cal, ev.report_date)
+    ev.claims = build_claims(cfg, storage, ev)
     for u in ev.upcoming:
         ev.sources[u.source_url] = u.source_name + (
             " — kalendarz" if u.kind != "earnings" else " — daty wyników (szacunek)")
@@ -233,6 +236,7 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
     if problems:
         raise ReportQAError("; ".join(problems))
     write_atomic(target, md)
+    record_claims(storage, ev.report_date, ev.claims)
     storage.record_run(
         run_id=run_id, report_date=ev.report_date,
         version=storage.next_report_version(ev.report_date),
@@ -545,3 +549,64 @@ def build_upcoming(cfg: Config, storage: Storage, cal: SessionCalendar, report_d
     if cfg.upcoming.market_closures:
         evs.extend(closures(cal.is_session, report_day, end))
     return within(evs, report_day, end)
+
+
+# --- Sekcja 9: weryfikacja tez -------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimView:
+    result: ClaimResult
+    previous: tuple[date_t, str] | None
+
+    @property
+    def changed(self) -> bool:
+        return self.previous is not None and self.previous[1] != self.result.status
+
+
+def claim_lookup(ev: EvidencePackage, storage: Storage) -> Callable[[ClaimPart],
+                                                                     tuple[float | None, date_t | None]]:
+    rows = {r.symbol.upper(): r for r in ev.rows}
+    funds = {f.ticker.upper(): f for f in ev.fundamentals}
+
+    def lookup(p: ClaimPart) -> tuple[float | None, date_t | None]:
+        if p.kind == "price":
+            r = rows.get((p.symbol or "").upper())
+            if r is None:
+                return None, None
+            return getattr(r.metrics, p.metric or ""), r.metrics.last_session
+        if p.kind == "fundamental":
+            f = funds.get((p.symbol or "").upper())
+            if f is None:
+                return None, None
+            return getattr(f, p.metric or ""), f.period_end
+        if p.kind == "macro":
+            obs = [(d, v) for d, v in storage.load_macro(p.series or "") if d <= ev.report_date]
+            return (obs[-1][1], obs[-1][0]) if obs else (None, None)
+        return None, None
+
+    return lookup
+
+
+def build_claims(cfg: Config, storage: Storage, ev: EvidencePackage) -> list[ClaimView]:
+    path = cfg.claims.path
+    try:
+        claims = [c for c in load_claims(path) if c.active]
+    except Exception as exc:  # a broken claims file must not stop the daily report
+        log.warning("claims.yaml: %s", exc)
+        ev.failed_sources["claims.yaml"] = type(exc).__name__
+        return []
+    lookup = claim_lookup(ev, storage)
+    out: list[ClaimView] = []
+    for c in claims:
+        res = evaluate_claim(c, lookup, ev.report_date)
+        out.append(ClaimView(res, storage.previous_claim_status(c.claim_id, ev.report_date)))
+        if c.source_url and c.source_url.startswith(("https://", "http://")):
+            ev.sources[c.source_url] = f"Teza: {c.source_name}"
+    return out
+
+
+def record_claims(storage: Storage, report_date: date_t, views: list[ClaimView]) -> None:
+    for v in views:
+        storage.record_claim_status(v.result.claim.claim_id, report_date, v.result.status,
+                                    v.result.reason)

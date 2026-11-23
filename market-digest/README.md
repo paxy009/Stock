@@ -61,6 +61,25 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 9: weryfikacja tez (`claims.yaml`)
+
+Tezy dopisujesz sam w `claims.yaml`. Każda teza ma treść, źródło, datę i **mierzalne części**:
+- `price`: symbol i metryka, np. `ret_5d`, `drawdown_52w`, `vs_sma50`;
+- `fundamental`: symbol i metryka, np. `revenue_yoy`, `pe_ttm`;
+- `macro`: seria FRED, np. `DGS10`;
+- `causal`: teza o przyczynie, której nie da się sprawdzić automatycznie.
+
+Program codziennie porównuje te części z danymi z raportu i nadaje status zgodny z polityką
+danych: `supported`, `contradicted`, `partially_supported`, `insufficient_evidence` albo
+`prediction_pending` (przed datą `check_after`). Zasady:
+- brak danych nie oznacza sprzeczności z tezą;
+- część `causal` nie pozwala uznać tezy za w pełni potwierdzoną;
+- historia statusów trafia do tabeli `claim_status_history`, a zmiany statusu są widoczne
+  w raporcie;
+- błędny plik nie zatrzymuje raportu; jest wymieniony w sekcji 11.
+
+Plik zawiera 3 przykładowe tezy do usunięcia lub podmiany.
+
 ## Sekcja 6: AI i infrastruktura
 
 Dane z faktów XBRL w SEC, które są już w cache:

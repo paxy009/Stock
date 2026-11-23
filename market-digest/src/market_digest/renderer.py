@@ -1,4 +1,4 @@
-﻿"""Markdown renderer following 02_REPORT_TEMPLATE. No network access, deterministic output."""
+"""Markdown renderer following 02_REPORT_TEMPLATE. No network access, deterministic output."""
 
 from __future__ import annotations
 
@@ -151,11 +151,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     _render_ai(ev, w)
     _render_sectors(ev, w)
     _render_scenarios(ev, w)
-    for title in ("9. Opinie z internetu — fact-check",):
-        w(f"## {title}")
-        w("")
-        w(UNAVAILABLE)
-        w("")
+    _render_claims(ev, w)
     _render_upcoming(ev, w)
     w("## 11. Jakość danych i ograniczenia")
     w("")
@@ -483,4 +479,41 @@ def _render_ai(ev: EvidencePackage, w: Callable[[str], None]) -> None:
       "spółki, nie tylko segment data center. Wzrost nakładów u odbiorców i przychodów "
       "u dostawców jest zgodny w czasie, ale nie dowodzi rentowności inwestycji w AI ani "
       "trwałości popytu. Leasing (np. finance leases) nie jest uwzględniony.*")
+    w("")
+
+
+CLAIM_STATUS_PL = {
+    "supported": "potwierdzona", "contradicted": "sprzeczna z danymi",
+    "partially_supported": "częściowo potwierdzona", "insufficient_evidence": "brak podstaw",
+    "prediction_pending": "prognoza — oczekuje",
+}
+PART_MARK = {"true": "✅", "false": "❌", "no_data": "❔", "not_checkable": "⚠️"}
+
+
+def _render_claims(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    w("## 9. Opinie z internetu — fact-check")
+    w("")
+    if not ev.claims:
+        w("Brak aktywnych tez do weryfikacji (plik `claims.yaml`).")
+        w("")
+        return
+    w("| Teza | Status weryfikacji | Uzasadnienie | Źródło |")
+    w("|---|---|---|---|")
+    for v in sorted(ev.claims, key=lambda x: (not x.changed, x.result.claim.claimed_at)):
+        c = v.result.claim
+        status = f"**{v.result.status}** ({CLAIM_STATUS_PL[v.result.status]})"
+        if v.changed and v.previous:
+            status += f" — zmiana z {v.previous[1]} ({v.previous[0].isoformat()})"
+        src = (f"[{c.source_name}]({c.source_url})" if c.source_url
+               and c.source_url.startswith(("https://", "http://")) else c.source_name)
+        w(f"| „{c.text}” ({c.claimed_at.isoformat()}) | {status} | {v.result.reason} | {src} |")
+    w("")
+    for v in ev.claims:
+        w(f"- **„{v.result.claim.text}”:** " + "; ".join(
+            f"{PART_MARK[p.status]} {p.text} → {p.observed}"
+            + (f" ({p.as_of.isoformat()})" if p.as_of else "") for p in v.result.parts))
+    w("")
+    w("*Tezy dodaje użytkownik w `claims.yaml`; program sprawdza tylko mierzalne części na "
+      "danych z raportu (ceny, SEC, FRED). Związki przyczynowe („spadło, bo…”) nie są "
+      "potwierdzane automatycznie. Status nie ocenia autora ani nie jest prawdopodobieństwem.*")
     w("")

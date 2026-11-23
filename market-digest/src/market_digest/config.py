@@ -154,6 +154,10 @@ class AiConfig(_Strict):
     suppliers: tuple[str, ...] = ("NVDA", "AVGO", "AMD")
 
 
+class ClaimsConfig(_Strict):
+    path: Path = Path("claims.yaml")
+
+
 class Config(_Strict):
     app: AppConfig = AppConfig()
     coverage: CoverageConfig
@@ -166,6 +170,7 @@ class Config(_Strict):
     macro: MacroConfig = Field(default_factory=MacroConfig)
     upcoming: UpcomingConfig = Field(default_factory=UpcomingConfig)
     ai: AiConfig = Field(default_factory=AiConfig)
+    claims: ClaimsConfig = Field(default_factory=ClaimsConfig)
     price_history_days: int = 400
     instruments: tuple[InstrumentConfig, ...]
     fx_pairs: dict[str, str] = Field(default_factory=dict)  # "USD" -> "USDPLN=X"

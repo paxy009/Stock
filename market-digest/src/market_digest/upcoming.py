@@ -1,4 +1,4 @@
-﻿"""Upcoming events (section 10): central bank meetings, earnings dates, exchange closures."""
+"""Upcoming events (section 10): central bank meetings, earnings dates, exchange closures."""
 
 from __future__ import annotations
 

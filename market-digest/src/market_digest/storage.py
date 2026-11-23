@@ -1,4 +1,4 @@
-﻿"""SQLite storage with versioned migrations and idempotent upserts. Timestamps in UTC."""
+"""SQLite storage with versioned migrations and idempotent upserts. Timestamps in UTC."""
 
 from __future__ import annotations
 
@@ -95,6 +95,15 @@ MIGRATIONS: list[str] = [
         value REAL NOT NULL,
         retrieved_at_utc TEXT NOT NULL,
         PRIMARY KEY (series_id, obs_date)
+    );
+    """,
+    """
+    CREATE TABLE claim_status_history (
+        claim_id TEXT NOT NULL,
+        report_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        PRIMARY KEY (claim_id, report_date)
     );
     """,
 ]
@@ -327,3 +336,19 @@ class Storage:
             (symbol, source_id, day.isoformat()),
         ).fetchone()
         return float(row[0]) if row and row[0] is not None else None
+
+    def record_claim_status(self, claim_id: str, report_date: date, status: str,
+                            reason: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO claim_status_history VALUES (?,?,?,?)",
+                (claim_id, report_date.isoformat(), status, reason),
+            )
+
+    def previous_claim_status(self, claim_id: str, report_date: date) -> tuple[date, str] | None:
+        row = self.conn.execute(
+            "SELECT report_date, status FROM claim_status_history WHERE claim_id=? "
+            "AND report_date < ? ORDER BY report_date DESC LIMIT 1",
+            (claim_id, report_date.isoformat()),
+        ).fetchone()
+        return (date.fromisoformat(row[0]), str(row[1])) if row else None
