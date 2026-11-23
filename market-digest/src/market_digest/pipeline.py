@@ -15,6 +15,7 @@ from pathlib import Path
 
 from market_digest import analytics
 from market_digest.calendar import SessionCalendar, local_date
+from market_digest.changes import compute_changes
 from market_digest.config import Config, InstrumentConfig
 from market_digest.delivery import Mailer, build_message, send_with_retry
 from market_digest.eligibility import classify
@@ -194,6 +195,9 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
     for m in off.macro:
         if m.value is not None:
             ev.sources[m.source_url] = f"FRED — {m.series_id}"
+    ev.changes = compute_changes(
+        storage.previous_snapshot(ev.report_date), ev,
+        lambda sym, d: storage.close_on(sym, "yfinance", d))
     fingerprint = ev.fingerprint()
     target = cfg.app.reports_dir / f"{ev.report_date.isoformat()}.md"
     if not force and storage.latest_fingerprint(ev.report_date) == fingerprint and target.exists():

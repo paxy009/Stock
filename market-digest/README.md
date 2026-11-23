@@ -61,6 +61,19 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
+## Sekcja 2: zmiany od poprzedniego raportu
+
+Raport porównuje swój pakiet dowodów z najnowszą wersją raportu z wcześniejszej daty (archiwum w
+SQLite, gałąź `data`). Pokazuje:
+- **ruch kursu benchmarków między raportami**, liczony od ceny z dnia sesji poprzedniego raportu
+  według aktualnych danych dostawcy, więc split nie tworzy fałszywego spadku;
+- **instrumenty bez nowej sesji** (weekend, święto), opisane wprost zamiast jako ruch „0%”;
+- **nowe obserwacje makro i nowe raporty okresowe SEC**;
+- **nowe wydarzenia oraz nowe źródła w sprawach już opisanych**;
+- **nowe 8-K**;
+- **sprostowania**: zmiana historycznego kursu u dostawcy, rewizja serii FRED, korekta
+  przychodów.
+
 ## Etap 3: SEC EDGAR + FRED
 
 - **Sekcja 4 (wyniki):** dla spółek z USA składających 10-Q/10-K, czyli NVDA, MSFT, GOOGL, AMZN,

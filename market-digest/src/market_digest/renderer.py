@@ -116,8 +116,7 @@ def render(ev: EvidencePackage, content: ReportContent) -> str:
     w("")
     w("## 2. Co zmieniło się od poprzedniego raportu?")
     w("")
-    w(UNAVAILABLE)
-    w("")
+    _render_changes(ev, w)
     w("## 3. Najważniejsze wiadomości i zdarzenia")
     w("")
     if not ev.events:
@@ -258,4 +257,37 @@ def _render_macro(ev: EvidencePackage, w: Callable[[str], None]) -> None:
       "nie data publikacji. Dane dzienne (stopy, rentowności, VIX) — ostatnia dostępna sesja. "
       "CPI/PCE jako zmiana r/r indeksu. Oczekiwania rynku co do przyszłych stóp ≠ bieżąca "
       "decyzja banku centralnego.*")
+    w("")
+
+
+def _render_changes(ev: EvidencePackage, w: Callable[[str], None]) -> None:
+    ch = ev.changes
+    if ch is None or ch.prev_report_date is None:
+        w("Brak wcześniejszego raportu w archiwum — porównanie pojawi się od następnego raportu.")
+        w("")
+        return
+    w(f"Porównanie z raportem z **{ch.prev_report_date}**.")
+    w("")
+    if ch.rows:
+        w("| Obszar | Poprzednio | Teraz | Znaczenie |")
+        w("|---|---|---|---|")
+        for c in ch.rows:
+            w(f"| {c.area} | {c.before} | {c.now} | {c.meaning} |")
+        w("")
+    else:
+        w("Brak zmian w monitorowanych wartościach.")
+        w("")
+    if ch.unchanged_sessions:
+        w(f"- **Bez nowej sesji od poprzedniego raportu:** {', '.join(ch.unchanged_sessions)} "
+          "(ceny bez zmian — to nie jest ruch 0%).")
+    events = "; ".join(f"[{t}]({u}) ({s})" for t, s, u in ch.new_events) or "brak"
+    w(f"- **Nowe potwierdzone wydarzenia:** {events}.")
+    follow = "; ".join(f"[{t}]({u}) (+{n} nowe źródło/a)" for t, n, u in ch.followups) or "brak"
+    w(f"- **Nowe informacje w istniejących sprawach:** {follow}.")
+    filings = "; ".join(f"[{label}]({u})" for label, u in ch.new_filings) or "brak"
+    w(f"- **Nowe zgłoszenia SEC:** {filings}.")
+    w(f"- **Sprostowania / zmiany danych:** {'; '.join(ch.corrections) or 'brak'}.")
+    w("")
+    w("*Ruch „między raportami” liczony od ceny z dnia sesji poprzedniego raportu, według "
+      "aktualnych danych dostawcy (uwzględnia splity i korekty).*")
     w("")

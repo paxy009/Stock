@@ -73,6 +73,7 @@ class EvidencePackage:
     fundamentals: list[Any] = field(default_factory=list)  # fundamentals.Fundamentals
     filings: list[dict[str, str]] = field(default_factory=list)
     macro: list[Any] = field(default_factory=list)  # macro.MacroRow
+    changes: Any = None  # changes.ChangeSet; derived from the previous report, not fingerprinted
 
     def allowed_urls(self) -> set[str]:
         return set(self.sources)

@@ -310,3 +310,20 @@ class Storage:
                 "SELECT obs_date, value FROM macro_observations WHERE series_id=? "
                 "ORDER BY obs_date", (series_id,))
         ]
+
+    def previous_snapshot(self, report_date: date) -> tuple[date, str] | None:
+        """Evidence of the latest version of the most recent report *before* ``report_date``."""
+        row = self.conn.execute(
+            "SELECT r.report_date, s.evidence_json FROM report_runs r "
+            "JOIN report_snapshots s ON s.run_id = r.run_id "
+            "WHERE r.report_date < ? ORDER BY r.report_date DESC, r.version DESC LIMIT 1",
+            (report_date.isoformat(),),
+        ).fetchone()
+        return (date.fromisoformat(row[0]), str(row[1])) if row else None
+
+    def close_on(self, symbol: str, source_id: str, day: date) -> float | None:
+        row = self.conn.execute(
+            "SELECT close FROM prices WHERE symbol=? AND source_id=? AND session_date=?",
+            (symbol, source_id, day.isoformat()),
+        ).fetchone()
+        return float(row[0]) if row and row[0] is not None else None
