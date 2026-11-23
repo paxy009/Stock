@@ -1,0 +1,106 @@
+name: Daily report
+
+on:
+  schedule:
+    - cron: "30 23 * * *"
+      timezone: "Europe/Warsaw"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "run = pobierz+wygeneruj+wyślij; deliver = tylko ponów wysyłkę"
+        type: choice
+        options: [run, deliver]
+        default: run
+      force:
+        description: "Wymuś nową wersję raportu (tylko mode=run)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # zapis stanu do gałęzi `data`
+
+concurrency:
+  group: market-digest-state
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      DIGEST_RECIPIENT_EMAIL: ${{ secrets.DIGEST_RECIPIENT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore state from branch `data`
+        run: |
+          mkdir -p market-digest/data market-digest/reports
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch --depth=1 origin data
+            git worktree add state origin/data
+            cp -a state/market.db market-digest/data/ 2>/dev/null || true
+            cp -a state/reports/. market-digest/reports/ 2>/dev/null || true
+          else
+            echo "Brak gałęzi data — pierwszy przebieg."
+          fi
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: market-digest/pyproject.toml
+      - run: pip install -e .
+        working-directory: market-digest
+
+      - name: Generate report
+        id: generate
+        if: github.event_name == 'schedule' || inputs.mode == 'run'
+        working-directory: market-digest
+        run: |
+          args="--scheduled"
+          if [ "${{ inputs.force }}" = "true" ]; then args="$args --force"; fi
+          market-digest run $args
+
+      - name: Deliver e-mail
+        id: deliver
+        if: steps.generate.outcome != 'failure'
+        continue-on-error: true
+        working-directory: market-digest
+        run: market-digest deliver --scheduled
+
+      - name: Save state to branch `data`
+        if: always()
+        run: |
+          set -e
+          if [ ! -d state ]; then
+            git worktree add --orphan -b data state
+          fi
+          cp -a market-digest/data/market.db state/ 2>/dev/null || true
+          mkdir -p state/reports
+          cp -a market-digest/reports/. state/reports/ 2>/dev/null || true
+          cd state
+          git config user.name "market-digest-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Brak zmian stanu."; exit 0; fi
+          git commit -m "state: $(date -u +%Y-%m-%dT%H:%MZ) run ${{ github.run_id }}"
+          git push origin HEAD:data
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-digest-${{ github.run_id }}
+          path: market-digest/reports/*.md
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Fail if delivery failed
+        if: steps.deliver.outcome == 'failure'
+        run: |
+          echo "::error::Wysyłka e-mail nie powiodła się. Raport jest w gałęzi data; ponów: Run workflow -> mode=deliver."
+          exit 1

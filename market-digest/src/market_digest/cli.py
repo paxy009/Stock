@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import typer
 
 from market_digest import pipeline
-from market_digest.calendar import ExchangeCalendars
+from market_digest.calendar import ExchangeCalendars, local_date
 from market_digest.config import Config, load_config
+from market_digest.delivery import DeliveryConfigError, SmtpMailer, SmtpSettings
 from market_digest.eligibility import classify
 from market_digest.providers.news import RssProvider
 from market_digest.providers.prices import YFinanceProvider
@@ -56,14 +57,65 @@ def report(config: Path = ConfigOpt, at: str | None = AtOpt,
 
 @app.command()
 def run(config: Path = ConfigOpt, at: str | None = AtOpt,
-        force: bool = typer.Option(False, help="Wygeneruj nową wersję mimo braku zmian")) -> None:
-    """Pełny przebieg: fetch + report."""
+        force: bool = typer.Option(False, help="Wygeneruj nową wersję mimo braku zmian"),
+        send: bool = typer.Option(False, "--send", help="Wyślij raport e-mailem po wygenerowaniu"),
+        scheduled: bool = typer.Option(False, "--scheduled",
+                                       help="Opóźniony start harmonogramu = slot 23:30 (nie zmienia daty)")
+        ) -> None:
+    """Pełny przebieg: fetch + report (+ opcjonalnie wysyłka)."""
     cfg, st = _setup(config)
     now = _now(at)
+    if scheduled:
+        now = pipeline.scheduled_moment(now, cfg)
     failed = pipeline.fetch(cfg, st, YFinanceProvider(), RssProvider(cfg.news.timeout_seconds,
                             cfg.news.max_items_per_feed), now)
     res = pipeline.generate(cfg, st, ExchangeCalendars(), now, failed_sources=failed, force=force)
     _print(res)
+    if send:
+        _deliver(cfg, st, now)
+
+
+@app.command()
+def deliver(config: Path = ConfigOpt, at: str | None = AtOpt,
+            report_date: str | None = typer.Option(None, "--date",
+                                                   help="Data raportu YYYY-MM-DD"),
+            scheduled: bool = typer.Option(False, "--scheduled",
+                                           help="Data raportu wg slotu harmonogramu")) -> None:
+    """Wyślij (lub ponów wysyłkę) istniejącego raportu bez ponownego generowania."""
+    cfg, st = _setup(config)
+    now = _now(at)
+    if scheduled:
+        now = pipeline.scheduled_moment(now, cfg)
+    _deliver(cfg, st, now, date.fromisoformat(report_date) if report_date else None)
+
+
+def _deliver(cfg: Config, st: Storage, now: datetime, day: date | None = None) -> None:
+    try:
+        smtp = SmtpSettings.from_env(cfg.delivery)
+    except DeliveryConfigError as exc:
+        typer.echo(f"Wysyłka niemożliwa: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    day = day or local_date(now, cfg.app.timezone)
+    out = pipeline.deliver(cfg, st, day, SmtpMailer(smtp, cfg.delivery.timeout_seconds),
+                           smtp.username, smtp.recipient, now)
+    typer.echo(f"Dostarczenie {day.isoformat()}: {out.status}"
+               + (f" ({out.error_category})" if out.error_category else ""))
+    if out.status in ("failed", "no_report"):
+        raise typer.Exit(1)
+
+
+@app.command()
+def heartbeat(config: Path = ConfigOpt, at: str | None = AtOpt,
+              max_age_hours: float = typer.Option(26.0, help="Maks. wiek ostatniej wysyłki")
+              ) -> None:
+    """Zwraca kod 1, jeśli od ostatniej udanej wysyłki minęło za dużo czasu."""
+    _, st = _setup(config)
+    last = st.last_successful_delivery()
+    now = _now(at)
+    if last is None or now - last > timedelta(hours=max_age_hours):
+        typer.echo(f"ALERT: ostatnia udana wysyłka: {last.isoformat() if last else 'nigdy'}")
+        raise typer.Exit(1)
+    typer.echo(f"OK: ostatnia udana wysyłka {last.isoformat()}")
 
 
 def _print(res: pipeline.RunResult) -> None:

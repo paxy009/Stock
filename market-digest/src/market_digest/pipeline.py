@@ -9,11 +9,13 @@ import tempfile
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from datetime import date as date_t
 from pathlib import Path
 
 from market_digest import analytics
 from market_digest.calendar import SessionCalendar, local_date
 from market_digest.config import Config
+from market_digest.delivery import Mailer, build_message, send_with_retry
 from market_digest.eligibility import classify
 from market_digest.events import group_events, rank_events
 from market_digest.evidence import EvidencePackage, InstrumentRow, RegionStatus, decide_status
@@ -192,3 +194,75 @@ def generate(cfg: Config, storage: Storage, cal: SessionCalendar, now_utc: datet
         report_sha256=hashlib.sha256(md.encode()).hexdigest(), evidence_json=ev.to_json(),
     )
     return RunResult(target, ev.content_status, content.generation_mode, skipped_unchanged=False)
+
+
+@dataclass(frozen=True, slots=True)
+class DeliverOutcome:
+    status: str  # sent | already_sent | failed | no_report | disabled
+    idempotency_key: str | None = None
+    error_category: str | None = None
+
+
+def _preview(md: str, status: str) -> str:
+    """Plain-text e-mail body: session dates + TL;DR lines from the already-validated report."""
+    lines = md.splitlines()
+    sessions = next((ln.lstrip("> ").strip() for ln in lines if "Ostatnie zakończone sesje" in ln), "")
+    tldr: list[str] = []
+    in_tldr = False
+    for ln in lines:
+        if ln.startswith("## TL;DR"):
+            in_tldr = True
+            continue
+        if in_tldr and ln.startswith("## "):
+            break
+        if in_tldr and ln[:2].rstrip(".").isdigit():
+            tldr.append(ln.replace("**", ""))
+    body = [f"Status raportu: {status}", sessions.replace("**", ""), "", "Najważniejsze:",
+            *tldr[:3], "", "Pełny raport w załączniku (.md).",
+            "Raport informacyjny, nie stanowi rekomendacji inwestycyjnej."]
+    return "\n".join(body)
+
+
+def deliver(cfg: Config, storage: Storage, report_date: date_t, mailer: Mailer,
+            sender: str, recipient: str, now_utc: datetime) -> DeliverOutcome:
+    """Send the latest report version for ``report_date`` once (idempotent per content)."""
+    run = storage.latest_run(report_date)
+    if not run or not Path(run["report_path"]).exists():
+        return DeliverOutcome("no_report")
+    key = f"{report_date.isoformat()}:{cfg.delivery.channel}:{run['report_sha256'][:16]}"
+    if storage.delivery_status(key) == "sent":
+        return DeliverOutcome("already_sent", key)
+    path = Path(run["report_path"])
+    status = run["content_status"].capitalize()
+    if run["generation_mode"] == "template_fallback":
+        status += " (fallback)"
+    msg = build_message(
+        path, sender=sender, recipient=recipient,
+        subject=f"Market Digest | {report_date.isoformat()} | {status}",
+        preview=_preview(path.read_text(encoding="utf-8"), status),
+    )
+    res = send_with_retry(mailer, msg, cfg.delivery.retries, cfg.delivery.retry_delay_seconds)
+    storage.record_delivery(run_id=run["run_id"], channel=cfg.delivery.channel,
+                            idempotency_key=key, status=res.status, delivery_id=res.delivery_id,
+                            error_category=res.error_category, at_utc=now_utc)
+    return DeliverOutcome(res.status, key, res.error_category)
+
+
+def scheduled_moment(now_utc: datetime, cfg: Config, grace_hours: int = 12) -> datetime:
+    """Snap a (possibly delayed) scheduled run to its intended slot, e.g. 23:30 Warsaw.
+
+    GitHub schedules can start late; a run at 00:40 must still produce the previous day's
+    report instead of shifting report_date by one day.
+    """
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(cfg.schedule.timezone)
+    local = now_utc.astimezone(tz)
+    slot_today = local.replace(hour=cfg.schedule.local_time.hour,
+                               minute=cfg.schedule.local_time.minute, second=0, microsecond=0)
+    if local >= slot_today:
+        return slot_today.astimezone(UTC)
+    slot_yesterday = (slot_today - timedelta(days=1)).replace(tzinfo=None).replace(tzinfo=tz)
+    if local - slot_yesterday <= timedelta(hours=grace_hours):
+        return slot_yesterday.astimezone(UTC)
+    return now_utc

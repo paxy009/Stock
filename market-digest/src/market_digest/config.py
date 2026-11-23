@@ -97,6 +97,21 @@ class LlmConfig(_Strict):
     provider: Literal["template"] = "template"
 
 
+class DeliveryConfig(_Strict):
+    """Only env var *names* live here; values come from the environment (GitHub Secrets)."""
+
+    enabled: bool = False
+    channel: Literal["email"] = "email"
+    smtp_host_env: str = "SMTP_HOST"
+    smtp_port_env: str = "SMTP_PORT"
+    smtp_username_env: str = "SMTP_USERNAME"
+    smtp_password_env: str = "SMTP_PASSWORD"
+    recipient_env: str = "DIGEST_RECIPIENT_EMAIL"
+    retries: int = Field(3, ge=1, le=10)
+    retry_delay_seconds: float = 10.0
+    timeout_seconds: float = 30.0
+
+
 class Config(_Strict):
     app: AppConfig = AppConfig()
     coverage: CoverageConfig
@@ -104,6 +119,7 @@ class Config(_Strict):
     report: ReportConfig = ReportConfig()
     news: NewsConfig = NewsConfig()
     llm: LlmConfig = LlmConfig()
+    delivery: DeliveryConfig = DeliveryConfig()
     price_history_days: int = 400
     instruments: tuple[InstrumentConfig, ...]
     fx_pairs: dict[str, str] = Field(default_factory=dict)  # "USD" -> "USDPLN=X"

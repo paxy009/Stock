@@ -61,8 +61,22 @@ CI: `.github/workflows/ci.yml`.
   (`classification_as_of`).
 - Kalendarz STOXX Europe 600 jest przybliżony kalendarzem Xetra.
 
-## Plan Etapu 2 (docelowo GitHub Actions)
+## Etap 2: automatyzacja (GitHub Actions)
 
-Workflow z harmonogramem 23:30 `Europe/Warsaw` i `workflow_dispatch`, stan (`market.db`,
-`reports/`) w gałęzi `data`, blokada przez `concurrency`, SMTP z kluczem idempotencji, sekrety
-w GitHub Secrets oraz alert, jeśli raport nie dotrze.
+| Workflow | Kiedy | Co robi |
+|---|---|---|
+| `daily.yml` | codziennie 23:30 `Europe/Warsaw` + ręcznie | odtwarza stan z gałęzi `data` → `run --scheduled` → `deliver` → zapis stanu do `data` |
+| `heartbeat.yml` | codziennie 02:30 `Europe/Warsaw` | błąd (i powiadomienie GitHub), jeśli brak udanej wysyłki w ostatnich 12 h |
+| `report.yml` | ręcznie | podgląd raportu jako artefakt, bez wysyłki i zapisu stanu |
+| `ci.yml` | push / PR | ruff, mypy, pytest |
+
+- **Sekrety** (Settings → Secrets → Actions): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD` (Gmail: hasło aplikacji), `DIGEST_RECIPIENT_EMAIL`. Nie trafiają do kodu ani logów.
+- **Stan**: `market.db` i `reports/` w osobnej gałęzi `data`; `concurrency` blokuje równoległe zapisy.
+- **Bez duplikatów**: klucz `data_raportu:email:sha_treści`; ponowny run tych samych danych nie
+  wysyła drugiego maila. Zmieniona treść = nowa wersja = nowy mail.
+- **Ponowienie samej wysyłki**: Actions → Daily report → Run workflow → `mode = deliver`.
+- **Opóźniony harmonogram**: start po północy nadal tworzy raport z datą poprzedniego dnia
+  (`--scheduled`). GitHub nie gwarantuje punktualności.
+- Lokalnie: `market-digest run --send`, `market-digest deliver --date 2026-11-23`,
+  `market-digest heartbeat` (zmienne SMTP w środowisku).

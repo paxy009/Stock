@@ -223,3 +223,42 @@ class Storage:
             (report_date.isoformat(),),
         ).fetchone()
         return str(row[0]) if row and row[0] else None
+
+    def latest_run(self, report_date: date) -> dict[str, str] | None:
+        row = self.conn.execute(
+            "SELECT run_id, version, content_status, generation_mode, report_path, report_sha256 "
+            "FROM report_runs WHERE report_date=? ORDER BY version DESC LIMIT 1",
+            (report_date.isoformat(),),
+        ).fetchone()
+        if not row:
+            return None
+        keys = ("run_id", "version", "content_status", "generation_mode", "report_path",
+                "report_sha256")
+        return {k: str(v) for k, v in zip(keys, row, strict=True)}
+
+    def delivery_status(self, idempotency_key: str) -> str | None:
+        row = self.conn.execute(
+            "SELECT status FROM delivery_attempts WHERE idempotency_key=?", (idempotency_key,)
+        ).fetchone()
+        return str(row[0]) if row else None
+
+    def record_delivery(self, *, run_id: str, channel: str, idempotency_key: str, status: str,
+                        delivery_id: str | None, error_category: str | None,
+                        at_utc: datetime) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO delivery_attempts (run_id, channel, idempotency_key, status, "
+                "delivery_id, last_attempt_at_utc, error_category) VALUES (?,?,?,?,?,?,?) "
+                "ON CONFLICT(idempotency_key) DO UPDATE SET status=excluded.status, "
+                "delivery_id=excluded.delivery_id, "
+                "last_attempt_at_utc=excluded.last_attempt_at_utc, "
+                "error_category=excluded.error_category",
+                (run_id, channel, idempotency_key, status, delivery_id, _iso(at_utc),
+                 error_category),
+            )
+
+    def last_successful_delivery(self) -> datetime | None:
+        row = self.conn.execute(
+            "SELECT MAX(last_attempt_at_utc) FROM delivery_attempts WHERE status='sent'"
+        ).fetchone()
+        return datetime.fromisoformat(row[0]) if row and row[0] else None
